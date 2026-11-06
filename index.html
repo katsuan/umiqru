@@ -82,6 +82,11 @@
   .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
   .chips::-webkit-scrollbar { display: none; }
   .chips button { flex: 0 0 auto; }
+  .sec-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .sec-head h2 { margin: 0; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: none; border-radius: 0; height: 32px; padding: 0 12px; font-size: 13px; }
+  .seg button + button { border-left: 1px solid var(--line); }
   .chips button.recent { height: 32px; font-size: 13px; }
 
   .card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
@@ -147,6 +152,8 @@
   table.tl .on { background: var(--band); color: var(--text); font-weight: 700; }
   table.tl td .arrow { display: block; margin: 0 auto 2px; }
   table.tl td { cursor: pointer; }
+  table.tl .tl-dir { display: block; font-size: 11px; color: var(--text-3); line-height: 1.3; }
+  table.tl .on .tl-dir { color: var(--text-2); }
   table.compact th, table.compact td { padding-right: 4px; }
   table.compact .arrow { width: 12px; height: 12px; vertical-align: -2px; }
   table.compact .key { gap: 4px; }
@@ -186,7 +193,13 @@
   </section>
 
   <section class="card">
-    <h2>風の強さ</h2>
+    <div class="sec-head">
+      <h2>風の強さ</h2>
+      <div class="seg" role="group" aria-label="風の向きの出し方">
+        <button type="button" data-dir="16">16方位</button>
+        <button type="button" data-dir="deg">角度</button>
+      </div>
+    </div>
     <ul class="legend" id="wind-legend"></ul>
     <div class="chart" id="wind-chart"></div>
     <div class="table-wrap"><table id="wind-table"></table></div>
@@ -251,7 +264,7 @@ const store = {
   get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
-const state = { place: null, ctx: null, data: null, day: 0, hour: 0, tideCache: {} };
+const state = { place: null, ctx: null, data: null, day: 0, hour: 0, tideCache: {}, windDir: store.get("marine-compare:winddir") === "deg" ? "deg" : "16" };
 
 // ---- 日付 ----
 function tokyoParts(d = new Date()) {
@@ -472,6 +485,8 @@ const hourlyPoints = (arr, day) => sliceDay(arr, day).map((y, x) => ({ x, y: y ?
 // ---- 数の見た目 ----
 const fmt = (v, d = 1) => v == null || Number.isNaN(v) ? "—" : v.toFixed(d);
 const DIRS = ["北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東", "南", "南南西", "南西", "西南西", "西", "西北西", "北西", "北北西"];
+// 風の向き：16方位（北北西）か角度（331°）。ボタンで切りかえる
+const windDirText = deg => deg == null ? "" : state.windDir === "deg" ? `${Math.round(((deg % 360) + 360) % 360)}°` : dirName(deg);
 const dirName = deg => deg == null ? "" : DIRS[Math.round((((deg % 360) + 360) % 360) / 22.5) % 16];
 // 来る向きの値。下向きの矢印を値ぶん回すと、進む向き（来る向き＋180°）を指す
 function arrow(deg) {
@@ -605,7 +620,7 @@ function grid3(series) {
 
 // 横にスクロールする時系列の表。列は時刻、行は予報ごと、マスは向きの矢印と値。マスを押すとその時刻に
 const tlScroll = {};
-function timeline(id, series, digits) {
+function timeline(id, series, digits, dirText = null) {
   const el = document.getElementById(id);
   const h = state.hour;
   const key = `${state.place?.name}:${state.day}`;
@@ -614,7 +629,7 @@ function timeline(id, series, digits) {
     <thead><tr><th class="stick">時刻</th>${Array.from({ length: 24 }, (_, t) => `<th class="${t === h ? "on" : ""}">${t}時</th>`).join("")}</tr></thead>
     <tbody>${series.map(s => `<tr><th class="stick"><span class="key"><i style="background:var(${s.color})"></i>${s.label.replace(NAMES.jma, "")}</span></th>${Array.from({ length: 24 }, (_, t) => {
       const v = valueAt(s, t);
-      return `<td data-h="${t}" class="${t === h ? "on" : ""}">${v == null ? "—" : `${arrow(s.dir[t])}${fmt(v, digits)}`}</td>`;
+      return `<td data-h="${t}" class="${t === h ? "on" : ""}">${v == null ? "—" : `${arrow(s.dir[t])}${dirText ? `<span class="tl-dir">${dirText(s.dir[t])}</span>` : ""}${fmt(v, digits)}`}</td>`;
     }).join("")}</tr>`).join("")}</tbody></table></div>`;
   const box = el.firstElementChild;
   // 場所か日が変わったときだけ、えらんだ時刻が見える所まで送る。ほかは前の位置のまま
@@ -694,10 +709,11 @@ function render() {
     <tbody>${wind.map(s => `<tr>
       <th><span class="key"><i style="background:var(${s.color})"></i>${s.label}</span></th>
       <td class="num">${fmt(valueAt(s, h))}</td>
-      <td>${arrow(s.dir[h])} ${dirName(s.dir[h])}</td></tr>`).join("")}
+      <td>${arrow(s.dir[h])} ${windDirText(s.dir[h])}</td></tr>`).join("")}
       <tr><th>文の予報</th><td colspan="2" class="wrap">${text?.wind || `<span class="muted">${state.day <= 2 ? "なし" : "3日先まで"}</span>`}</td></tr>
     </tbody>`;
-  timeline("wind-tl", wind, 1);
+  timeline("wind-tl", wind, 1, windDirText);
+  document.querySelectorAll("[data-dir]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.dir === state.windDir)));
 
   // 潮（夜をうすく。満潮・干潮に印）
   // 基準の高さがちがうので、どちらも「その日の平均からの差」
@@ -741,7 +757,7 @@ function render() {
     <dl class="facts">
       <div><dt>波（${NAMES.jma}）</dt><dd>${waveTop == null ? "—" : fmt(waveTop)}<span class="unit">${waveTop == null ? "" : "m まで"}</span><span class="note">${text?.wave || (!ctx.jma ? "日本だけ" : state.day > 2 ? "3日先まで" : "")}</span></dd></div>
       <div><dt>波（4つの予報）</dt><dd>${wr ? (wr.n > 1 && wr.hi - wr.lo >= 0.05 ? `${fmt(wr.lo)}〜${fmt(wr.hi)}` : fmt(wr.hi)) : "—"}<span class="unit">m</span><span class="note">${wr && wr.n > 1 ? `いちばん大きい差 ${fmt(wr.hi - wr.lo)} m` : ""}</span></dd></div>
-      <div><dt>風（${wind.filter(s => valueAt(s, h) != null).length}つの予報）</dt><dd>${r ? (r.n > 1 && r.hi - r.lo >= 0.05 ? `${fmt(r.lo)}〜${fmt(r.hi)}` : fmt(r.hi)) : "—"}<span class="unit">m/s</span><span class="note">${windDir != null ? `${dirName(windDir)}の風` : ""}</span></dd></div>
+      <div><dt>風（${wind.filter(s => valueAt(s, h) != null).length}つの予報）</dt><dd>${r ? (r.n > 1 && r.hi - r.lo >= 0.05 ? `${fmt(r.lo)}〜${fmt(r.hi)}` : fmt(r.hi)) : "—"}<span class="unit">m/s</span><span class="note">${windDir != null ? (state.windDir === "deg" ? `向き ${windDirText(windDir)}` : `${dirName(windDir)}の風`) : ""}</span></dd></div>
       <div><dt>潮</dt><dd>${tide ? tide.moon.title : "—"}<span class="note">${!tide ? "日本の港だけ" : nextTide ? `つぎ ${nextTide.k} ${nextTide.time}` : "この日はもうなし"}</span></dd></div>
       <div><dt>朝まづめ（めやす）</dt><dd>${mz ? `${hmText(mz.morning[0])}〜${hmText(mz.morning[1])}` : "—"}<span class="note">${mz ? `夕まづめ ${hmText(mz.evening[0])}〜${hmText(mz.evening[1])}` : "日本の港だけ"}</span></dd></div>
       <div><dt>水温</dt><dd>${fmt(sst)}<span class="unit">℃</span><span class="note">${NAMES.openMeteo}</span></dd></div>
@@ -822,6 +838,13 @@ function init() {
     refreshTide();
   });
   state.hour = tokyoParts().hour;
+  document.querySelector(".seg").addEventListener("click", ev => {
+    const b = ev.target.closest("[data-dir]");
+    if (!b || b.dataset.dir === state.windDir) return;
+    state.windDir = b.dataset.dir;
+    store.set("marine-compare:winddir", state.windDir);
+    render();
+  });
 
   document.getElementById("credits").innerHTML = `
     出どころ：<a href="https://www.jma.go.jp/bosai/" rel="noopener">${NAMES.jma}</a>（府県天気予報の天気・風・波・降水確率、警報と注意報）、
