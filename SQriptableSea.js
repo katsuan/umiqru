@@ -3,13 +3,13 @@
 // icon-color: blue; icon-glyph: water;
 
 // ======================================
-// SQriptable Sea（うみくるのウィジェット）
-// SQriptable.js（0.40.3）から sea カードの部分だけを切り出したもの。
-// 直すときは SQriptable.js を直して、tools/build-sea.mjs で作りなおす（このファイルを直接直さない）
+// うみくる（UmiQru）のウィジェット
+// ウィジェットの Parameter に場所を書くと、その場所の波・風・潮・天気が出ます（例：城ヶ島 / 32.7987,132.4959）。
+// 新しい版が出ると通知で知らせます。入れかえ方は https://katsuan.github.io/umiqru/#howto
 // ======================================
 
-// この版の番号（tools/build-sea.mjs が付ける）
-const SEA_BUILD = "e0d3785e3f";
+// この版の番号（新しい版が出たかを、ページの sea-version.json とくらべる）
+const SEA_BUILD = "605910b9e2";
 
 const PALETTE = {
   brand: "#6C47FF", // ConneQt の紫
@@ -1601,7 +1601,7 @@ const SEA = {
     { key: "ecmwf_ifs025", label: "欧州", color: "#EB6834" },
     { key: "gfs_seamless", label: "米国", color: "#6250D6" },
   ],
-  tideColor: "#1BAF7A",
+  tideColor: "#E87BA4", // 潮汐表（tide736.net）。波の「仏」と同じ色にしない
   // 気象庁の警報・注意報のうち、海に出るときに見るもの
   warnNames: {
     "02": "暴風雪警報", "03": "大雨警報", "05": "暴風警報", "07": "波浪警報", "08": "高潮警報",
