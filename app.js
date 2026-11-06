@@ -341,6 +341,16 @@ function init() {
   window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(render, 150); });
   drawRecent();
   drawHowto();
+  // ウィジェットの「新しい版があります」の通知から開いたとき（#howto）は、入れ方の欄を開いてそこまで
+  if (location.hash === "#howto") {
+    const det = document.getElementById("howto");
+    det.open = true;
+    setTimeout(() => det.scrollIntoView({ block: "start" }), 300);
+  }
+  // いまの版（ウィジェットが新しい版を見つけるときにくらべる番号）
+  fetch("sea-version.json").then(r => r.ok ? r.json() : null).then(v => {
+    if (v?.build) document.getElementById("howto-version").textContent = `いまの版：${v.build}（${v.date}）。新しい版が出ると、ウィジェットが iPhone の通知で知らせます。知らせが来たら、上のボタンでもう一度コピーし、${NAMES.scriptable} で「${NAMES.widgetScript}」を開いて、中身を全部選んでからペーストし、「Done」で閉じてください（Parameter はそのまま使えます）。`;
+  }).catch(() => {});
   document.getElementById("howto").addEventListener("toggle", ev => {
     const open = ev.currentTarget.open;
     ev.currentTarget.querySelector("summary .sub").textContent = open ? "閉じる" : "開く";

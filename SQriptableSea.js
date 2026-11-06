@@ -8,6 +8,9 @@
 // 直すときは SQriptable.js を直して、tools/build-sea.mjs で作りなおす（このファイルを直接直さない）
 // ======================================
 
+// この版の番号（tools/build-sea.mjs が付ける）
+const SEA_BUILD = "e0d3785e3f";
+
 const PALETTE = {
   brand: "#6C47FF", // ConneQt の紫
   warn: "#E5534B", // 日曜・祝日
@@ -2359,7 +2362,29 @@ function seaParam(raw) {
   return /^(sea|海)([:.：]|$)/i.test(text) ? text : `sea:${text.replace(/\s+/g, "")}`;
 }
 
+/**
+ * 新しい版があるか、12時間に1回だけ見る（ページの sea-version.json）。
+ * 新しければ iPhone の通知で知らせる（同じ版は1回だけ）。押すと、ページの入れ方の所が開く
+ */
+async function seaUpdateCheck() {
+  try {
+    const v = await getJSON(`${SEA.page}sea-version.json`, "sea_version.json", 60 * 12);
+    if (!v || !v.build || v.build === SEA_BUILD) return;
+    const told = readCache("sea_version_told");
+    if (told && told.build === v.build) return;
+    const n = new Notification();
+    n.title = `${SEA.names.page}のウィジェットに新しい版があります`;
+    n.body = "押すと入れ方のページが開きます。スクリプトをコピーして、いまのスクリプトに上書きしてください";
+    n.openURL = `${SEA.page}#howto`;
+    await n.schedule();
+    writeCache("sea_version_told", { build: v.build });
+  } catch (e) {
+    // 読めなくてもウィジェットは描く
+  }
+}
+
 async function seaOnlyRun() {
+  await seaUpdateCheck();
   if (config.runsInWidget || config.runsInAccessoryWidget) {
     const widget = await buildWidget(seaParam(args.widgetParameter), config.widgetFamily || "large");
     Script.setWidget(widget);

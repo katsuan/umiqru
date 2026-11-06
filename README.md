@@ -31,6 +31,7 @@
 | `js/format.js`・`js/time.js`・`js/net.js`・`js/store.js`・`js/state.js` | 数の見た目・日付・読みこみ・端末に残すもの・いま見ている場所と時刻 |
 | `data/ports.json` | tide736.net の港の一覧（位置つき） |
 | `SQriptableSea.js` | iPhone の Scriptable に入れる海のウィジェット。q-sqriptable の `tools/build-sea.mjs` で SQriptable.js から作る（直接直さない） |
+| `sea-version.json` | `SQriptableSea.js` の版の番号と日付（`tools/build-sea.mjs` が書く）。ウィジェットが12時間に1回読み、新しければ iPhone の通知で知らせる（押すと `#howto` で入れ方の欄が開く） |
 | `sw.js`・`manifest.webmanifest` | 電波がないときに開く仕組み（Q キットの sw-core.js）と、ホーム画面に置くときの設定 |
 | `tools/icon.py` | アイコン・ロゴ・OGP を作る（となりの q-oqrn の brandkit を使う） |
 
