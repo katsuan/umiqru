@@ -8,7 +8,7 @@ import { dayLabel, hm, hmText, hourlyPoints, sliceDay, tokyoParts } from "./js/t
 import { findPlace, km, placeContext } from "./js/place.js";
 import { loadForecasts, loadTide, tideFor } from "./js/forecast.js";
 import { jmaWarnings } from "./js/jma.js";
-import { arrow, dirName, esc, fmt, rainCell, rainMmCell, range, tempCell, valueAt, wxName, wxShort } from "./js/format.js";
+import { arrow, dirName, esc, fmt, rainCell, rainMmCell, range, tempCell, tideRange, valueAt, wxName, wxShort } from "./js/format.js";
 import { dashSwatch, drawChart, legend, timeline, tlScroll } from "./js/chart.js";
 
 // ---- 線 ----
@@ -139,7 +139,7 @@ function render() {
   ]);
   drawChart(document.getElementById("tide-chart"), { series: tideS, bands, marks, unit: "cm（平均からの差）", endLabels: false });
   document.getElementById("tide-list").innerHTML = tide
-    ? `<span>満潮 ${tide.flood.map(t => `${t.time}（${Math.round(t.cm)}cm）`).join("・") || "—"}</span><span>干潮 ${tide.edd.map(t => `${t.time}（${Math.round(t.cm)}cm）`).join("・") || "—"}</span><span>${esc(tide.moon.title)}（月齢 ${esc(tide.moon.age)}）</span>`
+    ? `<span>満潮 ${tide.flood.map(t => `${t.time}（${Math.round(t.cm)}cm）`).join("・") || "—"}</span><span>干潮 ${tide.edd.map(t => `${t.time}（${Math.round(t.cm)}cm）`).join("・") || "—"}</span><span>${esc(tide.moon.title)}（月齢 ${esc(tide.moon.age)}）</span>${tideRange(tide) ? `<span>${tideRange(tide)}</span>` : ""}`
     : `<span class="muted">${ctx.port ? "潮汐表を読めませんでした" : `潮汐表は日本の港（${PORT_MAX_KM}km 以内）だけです`}</span>`;
 
   // 天気：気象庁の文と6時間ごとの降水確率（3日先まで）、1時間ごとの表
@@ -207,7 +207,7 @@ function render() {
       <a class="fact" href="#sec-wave"><span class="dt"><span class="ls-icon is-text" data-icon="waves" aria-hidden="true"></span>波（4つの予報）</span><span class="dd">${wr ? (wr.n > 1 && wr.hi - wr.lo >= 0.05 ? `${fmt(wr.lo)}〜${fmt(wr.hi)}` : fmt(wr.hi)) : "—"}<span class="unit">m</span><span class="note">${wr && wr.n > 1 ? `いちばん大きい差 ${fmt(wr.hi - wr.lo)} m` : ""}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
       <a class="fact" href="#waves"><span class="dt"><span class="ls-icon is-text" data-icon="waves" aria-hidden="true"></span>波（${NAMES.jma}）</span><span class="dd">${waveTop == null ? "—" : fmt(waveTop)}<span class="unit">${waveTop == null ? "" : "m まで"}</span><span class="note">${text?.wave ? esc(text.wave) : (!ctx.jma ? "日本だけ" : state.day > 2 ? "3日先まで" : "")}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
       <a class="fact" href="#sec-wind"><span class="dt"><span class="ls-icon is-text" data-icon="wind" aria-hidden="true"></span>風（${wind.filter(s => valueAt(s, h) != null).length}つの予報）</span><span class="dd">${r ? (r.n > 1 && r.hi - r.lo >= 0.05 ? `${fmt(r.lo)}〜${fmt(r.hi)}` : fmt(r.hi)) : "—"}<span class="unit">m/s</span><span class="note">${windDir != null ? (state.windDir === "deg" ? `向き ${windDirText(windDir)}` : `${dirName(windDir)}の風`) : ""}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
-      <a class="fact" href="#sec-tide"><span class="dt"><span class="ls-icon is-text" data-icon="moon" aria-hidden="true"></span>潮</span><span class="dd">${tide ? esc(tide.moon.title) : "—"}<span class="note">${!tide ? "日本の港だけ" : nextTide ? `つぎ ${nextTide.when || ""}${nextTide.k} ${nextTide.time}` : "満潮・干潮の時刻を読めませんでした"}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
+      <a class="fact" href="#sec-tide"><span class="dt"><span class="ls-icon is-text" data-icon="moon" aria-hidden="true"></span>潮</span><span class="dd">${tide ? esc(tide.moon.title) : "—"}<span class="note">${!tide ? "日本の港だけ" : nextTide ? `${tideRange(tide) ? `${tideRange(tide)}<br>` : ""}つぎ ${nextTide.when || ""}${nextTide.k} ${nextTide.time}` : "満潮・干潮の時刻を読めませんでした"}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
       <a class="fact" href="#sec-tide"><span class="dt"><span class="ls-icon is-text" data-icon="sunrise" aria-hidden="true"></span>朝まづめ（めやす）</span><span class="dd">${mz ? `${hmText(mz.morning[0])}〜${hmText(mz.morning[1])}` : "—"}<span class="note">${mz ? `夕まづめ ${hmText(mz.evening[0])}〜${hmText(mz.evening[1])}` : "日本の港だけ"}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
       <a class="fact" href="#sec-wave"><span class="dt"><span class="ls-icon is-text" data-icon="thermometer" aria-hidden="true"></span>水温</span><span class="dd">${fmt(sst)}<span class="unit">℃</span><span class="note">${NAMES.openMeteo}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
       <a class="fact" href="#sec-weather"><span class="dt"><span class="ls-icon is-text" data-icon="cloud-sun" aria-hidden="true"></span>天気（${h}時）</span><span class="dd text">${wh ? esc(wxName(sliceDay(wh.weather_code, state.day)[h])) : "—"}<span class="note">${wh && sliceDay(wh.precipitation_probability, state.day)[h] != null ? `降水確率 ${sliceDay(wh.precipitation_probability, state.day)[h]}%` : ""}${pop ? `・${NAMES.jma} ${esc(pop.pop)}%（${pop.from}〜${pop.from + 6}時）` : ""}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>

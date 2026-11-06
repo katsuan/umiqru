@@ -8,7 +8,7 @@
 // 新しい版が出ると通知で知らせます。入れかえ方は https://katsuan.github.io/umiqru/#howto
 // ======================================
 
-const SEA_BUILD = "d2f0ed849f";
+const SEA_BUILD = "ef66c751ac";
 
 const PALETTE = {
   brand: "#6C47FF",
@@ -890,6 +890,7 @@ const SEA = {
     { key: "gfs_seamless", label: "GFS", color: "noaa" },
     { key: "ecmwf_ifs025", label: "IFS", color: "ecmwf" },
   ],
+  tideRangeText: (cm) => `潮位差 ${(Math.round(cm / 10) / 10).toFixed(1)}m`,
   tideColor: "tide",
   warnNames: {
     "02": "暴風雪警報", "03": "大雨警報", "05": "暴風警報", "07": "波浪警報", "08": "高潮警報",
@@ -1119,6 +1120,7 @@ async function loadSea(arg, ctx, item) {
       ...c.edd.map((p) => ({ m: i * 1440 + mins(p.time), cm: Math.round(p.cm), k: "干潮", time: p.time })),
     ]).sort((a, b) => a.m - b.m),
     moon: days.length ? days[0].moon.title : "",
+    tideRange: days.length && days[0].flood.length && days[0].edd.length ? Math.round(Math.max(...days[0].flood.map((p) => p.cm)) - Math.min(...days[0].edd.map((p) => p.cm))) : null,
     sun: days.map((c, i) => ({ rise: i * 1440 + mins(c.sun.rise), set: i * 1440 + mins(c.sun.set), tw0: i * 1440 + mins((c.sun.regular_twilight || [c.sun.rise])[0]), tw1: i * 1440 + mins((c.sun.regular_twilight || [0, c.sun.set])[1]) })),
     jma: [0, 1, 2].map((i) => jma[ymd(addDays(ctx.now, i))] || null),
     warns: warnJson && areaJma ? seaWarnings(warnJson, areaJma.c20) : [],
@@ -1476,7 +1478,11 @@ defineCard("sea", {
     const legendH = 12;
     const room = h - (big && wide ? 54 + (wxLine ? 14 : 0) : wide ? 46 : 58) - footH - axisH;
     const waveItems = [...d.waves, ...(j && j.nums.length ? [{ label: SEA.names.jma, dash: true }] : [])];
-    const tideTitle = d.port ? `潮 ${d.port.name}${d.moon ? `・${d.moon}` : ""}` : "潮";
+    const tideBase = d.port ? `潮 ${d.port.name}${d.moon ? `・${d.moon}` : ""}` : "潮";
+    const tideTitle = (cw) => {
+      const full = d.tideRange != null ? `${tideBase}・${SEA.tideRangeText(d.tideRange)}` : tideBase;
+      return textWidth(full, 9) * 1.15 + 8 <= cw ? full : tideBase;
+    };
     const windRows = d.winds.filter((m) => m.v.some((v) => v != null)).length || 1;
     let tableRowH = 24;
     const fitRowH = (avail, grow) => {
@@ -1489,7 +1495,7 @@ defineCard("sea", {
         seaLegend(col, "波 m", waveItems, 9, theme, cw);
         seaWaveGraph(col, d, ctx, view, cw, gh);
       } else if (g === "tide") {
-        seaLegend(col, tideTitle, [], 9, theme, cw);
+        seaLegend(col, tideTitle(cw), [], 9, theme, cw);
         if (d.tide.length) seaTideGraph(col, d, ctx, view, cw, gh);
         else txt(col, `${SEA.names.tide}は日本の港だけ`, 9, theme.sub, "medium");
       } else if (isTable(g, cw)) {

@@ -22,6 +22,12 @@ export function wxName(code) {
 export const wxShort = code => ({ "晴れ時々くもり": "晴/曇", "にわか雨": "にわか", "にわか雪": "雪", "くもり": "くもり" }[wxName(code)] || wxName(code));
 
 // ---- 数の見た目 ----
+// 潮位差：その日のいちばん高い満潮といちばん低い干潮の差。見せ方は SQriptable の SEA.tideRangeText と同じ（m で小数1けた）
+export function tideRange(tide) {
+  if (!tide?.flood.length || !tide.edd.length) return "";
+  const cm = Math.round(Math.max(...tide.flood.map(t => t.cm)) - Math.min(...tide.edd.map(t => t.cm)));
+  return `潮位差 ${(Math.round(cm / 10) / 10).toFixed(1)}m`;
+}
 export const fmt = (v, d = 1) => v == null || Number.isNaN(v) ? "—" : v.toFixed(d);
 export const DIRS = ["北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東", "南", "南南西", "南西", "西南西", "西", "西北西", "北西", "北北西"];
 // 風の向き：16方位（北北西）か角度（331°）。ボタンで切りかえる
