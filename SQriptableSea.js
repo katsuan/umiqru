@@ -8,7 +8,7 @@
 // 新しい版が出ると通知で知らせます。入れかえ方は https://katsuan.github.io/umiqru/#howto
 // ======================================
 
-const SEA_BUILD = "144f55ac59";
+const SEA_BUILD = "ca49ecde96";
 
 const PALETTE = {
   brand: "#6C47FF",
@@ -285,63 +285,6 @@ function buildTiles(widget, lines, ctx) {
   });
 }
 
-function cardPhoto(item, ctx, w, h) {
-  const card = CARDS[item.type];
-  if (!card || !card.photo || !item.data) return null;
-  try {
-    const img = card.photo(item.data, ctx);
-    return img ? coverImage(img, w, h) : null;
-  } catch (e) {
-    return null;
-  }
-}
-
-function coverImage(img, w, h) {
-  const k = 2;
-  const dc = new DrawContext();
-  dc.size = new Size(Math.round(w * k), Math.round(h * k));
-  dc.respectScreenScale = false;
-  dc.opaque = true;
-  const iw = img.size.width;
-  const ih = img.size.height;
-  const scale = Math.max((w * k) / iw, (h * k) / ih);
-  const dw = iw * scale;
-  const dh = ih * scale;
-  dc.drawImageInRect(img, new Rect((w * k - dw) / 2, (h * k - dh) / 2, dw, dh));
-  return dc.getImage();
-}
-
-function cardTint(item, ctx) {
-  const card = CARDS[item.type];
-  try {
-    return (card && card.tint && item.data && card.tint(item.data, ctx)) || null;
-  } catch (e) {
-    return null;
-  }
-}
-
-function tintedTile(hex, theme) {
-  const mix = (mode, t) => {
-    const a = hexToRgb(hex);
-    const b = hexToRgb(THEMES[mode].tile);
-    return new Color(rgbToHex(b.map((v, i) => v + (a[i] - v) * t)));
-  };
-  if (theme.mode === "auto") return Color.dynamic(mix("light", 0.16), mix("dark", 0.22));
-  return THEMES[theme.mode] ? mix(theme.mode, theme.mode === "light" ? 0.16 : 0.22) : theme.tile;
-}
-
-function cardBackground(item, ctx) {
-  const card = CARDS[item.type];
-  return (card && card.background && item.data && card.background(item.data, ctx)) || null;
-}
-
-function gradient(colors) {
-  const g = new LinearGradient();
-  g.colors = colors.map((c) => new Color(c));
-  g.locations = colors.map((c, i) => i / (colors.length - 1));
-  return g;
-}
-
 function tierOf(area) {
   if (area.h < 66) return "s";
   if (area.h >= 120 && area.w >= 130) return "l";
@@ -447,12 +390,12 @@ function isAccessory(family) {
 }
 
 const SF_FOR_EMOJI = {
-  "⏳": "hourglass", "☀️": "sun.max.fill", "🌤️": "cloud.sun.fill", "⛅": "cloud.sun.fill", "☁️": "cloud.fill",
+  "☀️": "sun.max.fill", "🌤️": "cloud.sun.fill", "⛅": "cloud.sun.fill", "☁️": "cloud.fill",
   "🌦️": "cloud.sun.rain.fill", "🌧️": "cloud.rain.fill", "⛈️": "cloud.bolt.rain.fill", "🌨️": "cloud.snow.fill", "❄️": "snowflake", "🌫️": "cloud.fog.fill", "🌙": "moon.stars.fill", "🌊": "water.waves", "💨": "wind",
 };
 
 const LINE_ICONS = {
-  "⏳": "hourglass", "☀️": "sun.max", "🌤️": "cloud.sun", "⛅": "cloud.sun", "☁️": "cloud",
+  "☀️": "sun.max", "🌤️": "cloud.sun", "⛅": "cloud.sun", "☁️": "cloud",
   "🌦️": "cloud.sun.rain", "🌧️": "cloud.rain", "⛈️": "cloud.bolt.rain", "🌨️": "cloud.snow", "❄️": "snowflake", "🌫️": "cloud.fog", "🌙": "moon.stars", "🌡️": "thermometer.medium",
   "☔": "umbrella", "🔐": "lock", "✏️": "pencil", "⚠️": "exclamationmark.triangle", "🌊": "water.waves", "💨": "wind",
   };
@@ -654,13 +597,6 @@ function hrow(stack, spacing = 4) {
   return row;
 }
 
-function image(stack, img, size, theme) {
-  const view = stack.addImage(img);
-  view.imageSize = new Size(size, size);
-  if (theme && theme.alpha < 1) view.imageOpacity = theme.alpha;
-  return view;
-}
-
 function isBig(ctx) {
   return ctx.tier === "l" && ctx.h >= 200;
 }
@@ -811,23 +747,6 @@ async function getJSON(url, key, maxAgeMin, item) {
   }
 }
 
-function cachedImage(key) {
-  const path = cachePath(key + ".png");
-  return fm.fileExists(path) ? fm.readImage(path) : null;
-}
-
-async function getImage(url, key) {
-  const path = cachePath(key + ".png");
-  const cached = cachedImage(key);
-  if (cached) return cached;
-  const img = await request(url).loadImage();
-  try {
-    fm.writeImage(path, img);
-  } catch (e) {
-  }
-  return img;
-}
-
 const CARDS = {};
 
 const ALIASES = {};
@@ -904,7 +823,7 @@ async function currentPlace() {
   } catch (e) {
     const last = readCache("place_here");
     if (last) return last;
-    throw new SetupError("weather:名古屋 のように場所を入れてね");
+    throw new SetupError("城ヶ島 のように場所を入れてね");
   }
 }
 
@@ -920,7 +839,7 @@ async function muniCode(lat, lon) {
   }
 }
 
-function pressureAxis(box, axis, w, size, theme) {
+function hourAxis(box, axis, w, size, theme) {
   const row = box.addStack();
   row.layoutHorizontally();
   row.size = new Size(w, 0);
@@ -1546,7 +1465,7 @@ defineCard("sea", {
         drawOne(col, g, cw, gh);
         if (!isTable(g, cw)) {
           col.addSpacer(2);
-          pressureAxis(col, view.axis, cw, 8, theme);
+          hourAxis(col, view.axis, cw, 8, theme);
         }
       });
     } else {
@@ -1568,7 +1487,7 @@ defineCard("sea", {
         if (isTable(g, w) && k) box.addSpacer(6);
         drawOne(box, g, w, gh);
         box.addSpacer(2);
-        if (k === lastGraph) pressureAxis(box, view.axis, w, 8, theme);
+        if (k === lastGraph) hourAxis(box, view.axis, w, 8, theme);
       });
     }
     box.addSpacer();
@@ -1665,6 +1584,12 @@ async function buildWidget(raw, family) {
   else buildTiles(widget, [[item]], ctx);
   return widget;
 }
+
+function cardPhoto() { return null; }
+function cardBackground() { return null; }
+function cardTint() { return null; }
+function gradient() { return null; }
+function tintedTile(hex, theme) { return theme.tile; }
 
 function seaParam(raw) {
   const text = String(raw || "").trim();
