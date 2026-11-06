@@ -139,6 +139,14 @@
   td.wrap { white-space: normal; }
   th { white-space: nowrap; }
   table.compact { font-size: 12px; }
+  .timeline { overflow-x: auto; margin-top: 8px; -webkit-overflow-scrolling: touch; }
+  table.tl { width: auto; border-collapse: separate; border-spacing: 0; font-size: 12px; margin: 0; }
+  table.tl th, table.tl td { padding: 4px 0; text-align: center; min-width: 40px; border-top: 1px solid var(--grid); }
+  table.tl thead th { border-top: none; }
+  table.tl .stick { position: sticky; left: 0; z-index: 1; background: var(--surface); text-align: left; min-width: 64px; padding-right: 8px; }
+  table.tl .on { background: var(--band); color: var(--text); font-weight: 700; }
+  table.tl td .arrow { display: block; margin: 0 auto 2px; }
+  table.tl td { cursor: pointer; }
   table.compact th, table.compact td { padding-right: 4px; }
   table.compact .arrow { width: 12px; height: 12px; vertical-align: -2px; }
   table.compact .key { gap: 4px; }
@@ -173,8 +181,8 @@
     <ul class="legend" id="wave-legend"></ul>
     <div class="chart" id="wave-chart"></div>
     <div class="table-wrap"><table id="wave-table"></table></div>
-    <h3 class="small sub" style="margin:16px 0 0;font-weight:700">3時間ごとに並べる（m）</h3>
-    <div class="table-wrap"><table id="wave-grid"></table></div>
+    <h3 class="small sub" style="margin:16px 0 0;font-weight:700">1時間ごと（来る向きと高さ m・横にスクロール）</h3>
+    <div id="wave-tl"></div>
   </section>
 
   <section class="card">
@@ -182,8 +190,8 @@
     <ul class="legend" id="wind-legend"></ul>
     <div class="chart" id="wind-chart"></div>
     <div class="table-wrap"><table id="wind-table"></table></div>
-    <h3 class="small sub" style="margin:16px 0 0;font-weight:700">1時間ごとに並べる（吹いてくる向きと風速 m/s）</h3>
-    <div class="table-wrap"><table id="wind-grid" class="compact"></table></div>
+    <h3 class="small sub" style="margin:16px 0 0;font-weight:700">1時間ごと（吹いてくる向きと風速 m/s・横にスクロール）</h3>
+    <div id="wind-tl"></div>
   </section>
 
   <section class="card">
@@ -595,6 +603,28 @@ function grid3(series) {
     }).join("")}</tbody>`;
 }
 
+// 横にスクロールする時系列の表。列は時刻、行は予報ごと、マスは向きの矢印と値。マスを押すとその時刻に
+const tlScroll = {};
+function timeline(id, series, digits) {
+  const el = document.getElementById(id);
+  const h = state.hour;
+  const key = `${state.place?.name}:${state.day}`;
+  const keep = el.firstElementChild ? el.firstElementChild.scrollLeft : 0;
+  el.innerHTML = `<div class="timeline-in" style="overflow-x:auto"><table class="tl">
+    <thead><tr><th class="stick">時刻</th>${Array.from({ length: 24 }, (_, t) => `<th class="${t === h ? "on" : ""}">${t}時</th>`).join("")}</tr></thead>
+    <tbody>${series.map(s => `<tr><th class="stick"><span class="key"><i style="background:var(${s.color})"></i>${s.label.replace(NAMES.jma, "")}</span></th>${Array.from({ length: 24 }, (_, t) => {
+      const v = valueAt(s, t);
+      return `<td data-h="${t}" class="${t === h ? "on" : ""}">${v == null ? "—" : `${arrow(s.dir[t])}${fmt(v, digits)}`}</td>`;
+    }).join("")}</tr>`).join("")}</tbody></table></div>`;
+  const box = el.firstElementChild;
+  // 場所か日が変わったときだけ、えらんだ時刻が見える所まで送る。ほかは前の位置のまま
+  if (tlScroll[id] !== key) {
+    tlScroll[id] = key;
+    box.scrollLeft = Math.max(0, h - 1) * 40;
+  } else box.scrollLeft = keep;
+  box.onclick = ev => { const td = ev.target.closest("td[data-h]"); if (td) setHour(Number(td.dataset.h)); };
+}
+
 // 風：1時間ごとに、予報ごとの向きと風速
 function windGrid(series) {
   const h = state.hour;
@@ -653,7 +683,7 @@ function render() {
       <th><span class="key"><i style="background:var(${s.color})"></i>${s.label}${off[s.key] ? `<span class="muted small">（${off[s.key]}km沖）</span>` : ""}</span></th>
       <td class="num">${fmt(valueAt(s, h))}</td><td class="num">${fmt(s.period[h])}</td><td class="num">${fmt(s.swell[h])}</td>
       <td>${arrow(s.dir[h])} ${dirName(s.dir[h])}</td></tr>`).join("")}</tbody>`;
-  document.getElementById("wave-grid").innerHTML = grid3(waves);
+  timeline("wave-tl", waves, 1);
 
   // 風（気象庁の2つの計算）
   const wind = windSeries(d);
@@ -667,7 +697,7 @@ function render() {
       <td>${arrow(s.dir[h])} ${dirName(s.dir[h])}</td></tr>`).join("")}
       <tr><th>文の予報</th><td colspan="2" class="wrap">${text?.wind || `<span class="muted">${state.day <= 2 ? "なし" : "3日先まで"}</span>`}</td></tr>
     </tbody>`;
-  document.getElementById("wind-grid").innerHTML = windGrid(wind);
+  timeline("wind-tl", wind, 1);
 
   // 潮（夜をうすく。満潮・干潮に印）
   // 基準の高さがちがうので、どちらも「その日の平均からの差」
