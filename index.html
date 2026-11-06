@@ -42,9 +42,7 @@
       <label class="vh" for="place-input">場所</label>
       <input type="search" id="place-input" placeholder="港・地名（例：城ヶ島、鴨川）" enterkeyhint="search">
       <button type="submit" class="primary">見る</button>
-      <button type="button" id="here" aria-label="今いる場所">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2"/></svg>
-      </button>
+      <button type="button" id="here" aria-label="今いる場所"><span class="ls-icon" data-icon="place" aria-hidden="true"></span></button>
     </div>
     <div class="chips" id="recent"></div>
     <div class="chips" id="days" role="group" aria-label="日にち"></div>
@@ -56,14 +54,18 @@
   <section class="card" id="summary"></section>
 
   <section class="card">
-    <h2>天気と降水確率</h2>
+    <h2><span class="ls-icon is-text" data-icon="cloud-sun" aria-hidden="true"></span>天気と降水確率</h2>
     <div id="wx-jma"></div>
     <h3 class="small sub" style="margin:16px 0 0;font-weight:700">1時間ごと（横にスクロール）</h3>
     <div id="wx-tl"></div>
+    <p class="wx-key">
+      <span><i style="background:rgba(42,120,214,.2)"></i><i style="background:rgba(42,120,214,.5)"></i><i style="background:rgba(42,120,214,.85)"></i>降水確率・雨（濃いほど高い・多い）</span>
+      <span><i style="background:rgba(42,120,214,.5)"></i><i style="background:transparent;border:1px solid var(--line)"></i><i style="background:rgba(235,104,52,.5)"></i>気温（18℃が白。寒いと青・暑いと橙）</span>
+    </p>
   </section>
 
   <section class="card">
-    <h2>波の高さ</h2>
+    <h2><span class="ls-icon is-text" data-icon="waves" aria-hidden="true"></span>波の高さ</h2>
     <div id="waves"></div>
     <ul class="legend" id="wave-legend"></ul>
     <div class="chart" id="wave-chart"></div>
@@ -74,7 +76,7 @@
 
   <section class="card">
     <div class="sec-head">
-      <h2>風の強さ</h2>
+      <h2><span class="ls-icon is-text" data-icon="wind" aria-hidden="true"></span>風の強さ</h2>
       <div class="seg" role="group" aria-label="風の向きの出し方">
         <button type="button" data-dir="16">16方位</button>
         <button type="button" data-dir="deg">角度</button>
@@ -88,7 +90,7 @@
   </section>
 
   <section class="card">
-    <h2>潮の満ち引き</h2>
+    <h2><span class="ls-icon is-text" data-icon="moon" aria-hidden="true"></span>潮の満ち引き</h2>
     <ul class="legend" id="tide-legend"></ul>
     <div class="chart" id="tide-chart"></div>
     <div class="tides" id="tide-list"></div>
@@ -96,7 +98,7 @@
 
   <section class="card">
     <details class="howto" id="howto">
-      <summary><span id="howto-title"></span><span class="sub">開く</span></summary>
+      <summary><span><span class="ls-icon is-text" data-icon="app" aria-hidden="true"></span><span id="howto-title"></span></span><span class="sub">開く</span></summary>
       <p class="sub small" style="margin:0 0 8px" id="howto-lead"></p>
       <ol class="steps" id="howto-steps"></ol>
       <h3 class="small sub" style="margin:16px 0 0;font-weight:700">Parameter の書き方</h3>

@@ -162,3 +162,18 @@
 /* 名前と、ひとこと（Q キットの ls-brand）の下のあき */
 .ls-brand { margin-top: 8px; }
 .ls-brand-copy { margin-bottom: 16px; }
+
+/* 天気の表：色を付けたマスでも、えらんだ時刻がわかるように枠を */
+table.tl td.on[style] { box-shadow: inset 0 0 0 2px var(--text-2); }
+table.jma-days th[rowspan] { vertical-align: top; white-space: nowrap; }
+table.jma-days tr.pop td { border-top: none; padding-top: 2px; padding-bottom: 2px; }
+table.jma-days tr.day-head td, table.jma-days tr.day-head th { padding-top: 8px; }
+table.jma-days td.pct { width: 72px; border-radius: 4px; padding-right: 8px; }
+table.jma-days tr.pop.on td:first-child { font-weight: 700; color: var(--text); }
+.wx-key { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; color: var(--text-3); margin: 8px 0 0; }
+.wx-key i { display: inline-block; width: 12px; height: 10px; border-radius: 2px; vertical-align: -1px; margin-right: 2px; }
+.wx-key i:last-of-type { margin-right: 6px; }
+
+/* 線アイコン（Q キットの ls-icon）。見出しの字と同じ色、まとめの項目は うすい字の色 */
+h2 .ls-icon, .facts dt .ls-icon { vertical-align: -0.15em; }
+.alert .ls-icon { flex: 0 0 auto; margin-top: 3px; color: var(--text-2); }

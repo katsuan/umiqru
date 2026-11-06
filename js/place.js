@@ -26,18 +26,19 @@ export async function findPlace(text) {
   const ports = await loadPorts();
   const exact = ports.find(p => p.name === text);
   if (exact) return { name: exact.name, lat: exact.lat, lon: exact.lon };
-  const found = [];
-  for (const name of [text, text + "市", text + "町"]) {
+  // 「○○」と「○○市」をいっしょにさがす（なければ「○○町」も）。候補は、日本・近くに潮の港（30km 以内）がある・人の多い の順に選ぶ
+  const search = async name => {
     try {
       const j = await getJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=10&language=ja&format=json`);
-      found.push(...(j.results || []));
-    } catch {}
-    if (found.length && name === text) break;
-  }
+      return j.results || [];
+    } catch { return []; }
+  };
+  let found = (await Promise.all([text, text + "市"].map(search))).flat();
+  if (!found.length) found = await search(text + "町");
   if (found.length) {
-    // 日本の場所を先に。なければ世界のどこでも
-    const jp = found.filter(r => r.country_code === "JP");
-    const best = (jp.length ? jp : found).sort((a, b) => (b.population || 0) - (a.population || 0))[0];
+    const near = r => ports.some(p => km({ lat: r.latitude, lon: r.longitude }, p) <= PORT_MAX_KM);
+    const score = r => (r.country_code === "JP" ? 2 : 0) + (near(r) ? 1 : 0);
+    const best = found.sort((a, b) => score(b) - score(a) || (b.population || 0) - (a.population || 0))[0];
     return { name: text, lat: best.latitude, lon: best.longitude };
   }
   const part = ports.find(p => p.name.includes(text) || text.includes(p.name));

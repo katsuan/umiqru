@@ -36,3 +36,23 @@ export function range(vals) {
   const v = vals.filter(x => x != null);
   return v.length ? { lo: Math.min(...v), hi: Math.max(...v), n: v.length } : null;
 }
+
+// 表のマスの色。降水確率・雨は青1色の濃淡（高いほど濃い）。気温は 18℃を白に、寒いほど青・暑いほど橙
+// 色の上の字は、濃いときだけ白に（うすい色ではふつうの字の色のまま）
+export function rainCell(pct) {
+  if (pct == null || pct <= 0) return "";
+  const a = Math.min(0.85, 0.12 + (pct / 100) * 0.73);
+  return ` style="background:rgba(42,120,214,${a.toFixed(2)})${a >= 0.55 ? ";color:#fff" : ""}"`;
+}
+export function rainMmCell(mm) {
+  if (mm == null || mm <= 0) return "";
+  return rainCell(Math.min(100, 30 + mm * 14));
+}
+export function tempCell(t) {
+  if (t == null) return "";
+  const diff = t - 18;
+  const a = Math.min(0.7, (Math.abs(diff) / 14) * 0.7);
+  if (a < 0.06) return "";
+  const rgb = diff < 0 ? "42,120,214" : "235,104,52";
+  return ` style="background:rgba(${rgb},${a.toFixed(2)})${a >= 0.55 ? ";color:#fff" : ""}"`;
+}
