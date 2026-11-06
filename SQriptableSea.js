@@ -8,7 +8,7 @@
 // 新しい版が出ると通知で知らせます。入れかえ方は https://katsuan.github.io/umiqru/#howto
 // ======================================
 
-const SEA_BUILD = "df3fe46310";
+const SEA_BUILD = "144f55ac59";
 
 const PALETTE = {
   brand: "#6C47FF",
@@ -447,30 +447,15 @@ function isAccessory(family) {
 }
 
 const SF_FOR_EMOJI = {
-  "🗓️": "calendar", "📅": "calendar", "☑️": "checklist", "🎂": "birthday.cake.fill", "📷": "photo",
-  "🔋": "battery.75percent", "⚡": "bolt.fill", "⏳": "hourglass", "🎌": "flag.fill", "⛩️": "sparkles",
-  "🌀": "gauge.with.dots.needle.33percent", "🍅": "timer", "☕": "cup.and.saucer.fill", "🕒": "clock", "🕰️": "clock",
-  "☀️": "sun.max.fill", "🌤️": "cloud.sun.fill", "⛅": "cloud.sun.fill", "🌥️": "cloud.sun.fill", "☁️": "cloud.fill",
-  "🌦️": "cloud.sun.rain.fill", "🌧️": "cloud.rain.fill", "⛈️": "cloud.bolt.rain.fill", "🌩️": "cloud.bolt.fill",
-  "🌨️": "cloud.snow.fill", "❄️": "snowflake", "🌫️": "cloud.fog.fill", "🌙": "moon.stars.fill", "🌛": "moon.fill",
-  "🌑": "moonphase.new.moon", "🌒": "moonphase.waxing.crescent", "🌓": "moonphase.first.quarter", "🌔": "moonphase.waxing.gibbous",
-  "🌕": "moonphase.full.moon", "🌖": "moonphase.waning.gibbous", "🌗": "moonphase.last.quarter", "🌘": "moonphase.waning.crescent",
-  "🌅": "sunrise.fill", "🌇": "sunset.fill", "🌊": "water.waves", "💨": "wind",
+  "⏳": "hourglass", "☀️": "sun.max.fill", "🌤️": "cloud.sun.fill", "⛅": "cloud.sun.fill", "☁️": "cloud.fill",
+  "🌦️": "cloud.sun.rain.fill", "🌧️": "cloud.rain.fill", "⛈️": "cloud.bolt.rain.fill", "🌨️": "cloud.snow.fill", "❄️": "snowflake", "🌫️": "cloud.fog.fill", "🌙": "moon.stars.fill", "🌊": "water.waves", "💨": "wind",
 };
 
 const LINE_ICONS = {
-  "🗓️": "calendar", "📅": "calendar", "☑️": "checklist", "🎂": "birthday.cake", "📷": "photo",
-  "🔋": "battery.75percent", "⚡": "bolt", "⏳": "hourglass", "🎌": "flag", "⛩️": "scroll",
-  "🌀": "gauge.with.dots.needle.33percent", "🍅": "timer", "☕": "cup.and.saucer", "🕒": "clock", "🕰️": "clock", "⏱️": "chart.bar", "⏱": "clock",
-  "☀️": "sun.max", "🌤️": "cloud.sun", "⛅": "cloud.sun", "🌥️": "cloud.sun", "☁️": "cloud",
-  "🌦️": "cloud.sun.rain", "🌧️": "cloud.rain", "⛈️": "cloud.bolt.rain", "🌩️": "cloud.bolt",
-  "🌨️": "cloud.snow", "❄️": "snowflake", "🌫️": "cloud.fog", "🌙": "moon.stars", "🌛": "moon", "🌡️": "thermometer.medium",
-  "🌑": "moonphase.new.moon", "🌒": "moonphase.waxing.crescent", "🌓": "moonphase.first.quarter", "🌔": "moonphase.waxing.gibbous",
-  "🌕": "moonphase.full.moon", "🌖": "moonphase.waning.gibbous", "🌗": "moonphase.last.quarter", "🌘": "moonphase.waning.crescent",
-  "🌅": "sunrise", "🌇": "sunset", "☔": "umbrella", "💬": "bubble.left", "🎲": "dice", "🎉": "party.popper",
-  "💞": "heart", "🔐": "lock", "✏️": "pencil", "⚠️": "exclamationmark.triangle", "🌊": "water.waves", "💨": "wind",
-  "✅": "checkmark.circle", "🔢": "number", "🚨": "exclamationmark.triangle", "🛡️": "shield", "🌿": "leaf", "📝": "note.text", "🔗": "link", "🧹": "sparkles", "🔥": "flame", "⚪": "circle",
-};
+  "⏳": "hourglass", "☀️": "sun.max", "🌤️": "cloud.sun", "⛅": "cloud.sun", "☁️": "cloud",
+  "🌦️": "cloud.sun.rain", "🌧️": "cloud.rain", "⛈️": "cloud.bolt.rain", "🌨️": "cloud.snow", "❄️": "snowflake", "🌫️": "cloud.fog", "🌙": "moon.stars", "🌡️": "thermometer.medium",
+  "☔": "umbrella", "🔐": "lock", "✏️": "pencil", "⚠️": "exclamationmark.triangle", "🌊": "water.waves", "💨": "wind",
+  };
 
 let symbolStyle = "line";
 
@@ -765,10 +750,7 @@ function writeCache(key, value) {
 }
 
 const PERMS = {
-  calendar: { label: "カレンダー", used: "agenda（今日の予定）" },
-  reminders: { label: "リマインダー", used: "todo" },
-  contacts: { label: "連絡先", used: "bday（誕生日と、その通知）", notice: "誕生日の通知" },
-  location: { label: "位置情報", used: "場所を書かない weather・pressure・sun", retryMin: 30 },
+  location: { label: "位置情報", used: "場所を書かないとき（今いる場所の海）", retryMin: 30 },
 };
 
 const PERM_RETRY_MIN = 6 * 60;
