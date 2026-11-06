@@ -324,6 +324,47 @@ function drawHowto() {
   document.getElementById("copy-param").onclick = ev => copyText(() => document.getElementById("howto-param").textContent, ev.currentTarget);
 }
 
+// ---- くわしい欄のタブ ----
+// ウィジェットと同じ並び（波・潮・風・天気）
+const TABS = ["wave", "tide", "wind", "weather"];
+// key の欄だけを出す。scroll … タブの帯が見えるところまで送る（まとめの項目を押したとき）
+function showTab(key, scroll = false) {
+  if (!TABS.includes(key)) key = TABS[0];
+  TABS.forEach(k => {
+    const on = k === key;
+    const tab = document.getElementById(`tab-${k}`);
+    tab.setAttribute("aria-selected", String(on));
+    tab.tabIndex = on ? 0 : -1;
+    document.getElementById(`sec-${k}`).hidden = !on;
+  });
+  store.set("umiqru:tab", key);
+  // 隠れていた欄は幅が0なので、出してから描き直す。横スクロールの表は、えらんだ時刻まで送りなおす
+  Object.keys(tlScroll).forEach(id => delete tlScroll[id]);
+  render();
+  if (scroll) document.getElementById("tabs").scrollIntoView({ block: "start" });
+}
+function initTabs() {
+  const bar = document.getElementById("tabs");
+  bar.addEventListener("click", ev => { const b = ev.target.closest("[data-tab]"); if (b) showTab(b.dataset.tab); });
+  // ← → で となりのタブへ
+  bar.addEventListener("keydown", ev => {
+    if (ev.key !== "ArrowLeft" && ev.key !== "ArrowRight") return;
+    const i = TABS.indexOf(store.get("umiqru:tab"));
+    const next = TABS[(i + (ev.key === "ArrowRight" ? 1 : TABS.length - 1)) % TABS.length];
+    showTab(next);
+    document.getElementById(`tab-${next}`).focus();
+  });
+  // まとめの項目（#sec-wave など）を押したら、その欄に切りかえてタブの帯まで
+  document.getElementById("summary").addEventListener("click", ev => {
+    const a = ev.target.closest('a[href^="#sec-"]');
+    if (!a) return;
+    ev.preventDefault();
+    showTab(a.getAttribute("href").slice(5), true);
+  });
+  const fromHash = location.hash.startsWith("#sec-") ? location.hash.slice(5) : null;
+  showTab(fromHash || store.get("umiqru:tab") || TABS[0], !!fromHash);
+}
+
 function init() {
   state.render = render;
   // 電波がなくても、一度開いたページは開けるように（中身は Q キットの sw-core.js）
@@ -385,6 +426,7 @@ function init() {
   window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(render, 150); });
   drawRecent();
   drawHowto();
+  initTabs();
   // ウィジェットの「新しい版があります」の通知から開いたとき（#howto）は、入れ方の欄を開いてそこまで
   if (location.hash === "#howto") {
     const det = document.getElementById("howto");

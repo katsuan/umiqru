@@ -51,18 +51,15 @@
 
   <section class="card" id="summary"></section>
 
-  <section class="card" id="sec-weather">
-    <h2><span class="ls-icon is-text" data-icon="cloud-sun" aria-hidden="true"></span>天気と降水確率</h2>
-    <div id="wx-jma"></div>
-    <h3 class="small sub" style="margin:16px 0 0;font-weight:700">1時間ごと（横にスクロール）</h3>
-    <div id="wx-tl"></div>
-    <p class="wx-key">
-      <span><i style="background:rgba(42,120,214,.2)"></i><i style="background:rgba(42,120,214,.5)"></i><i style="background:rgba(42,120,214,.85)"></i>降水確率・雨（濃いほど高い・多い）</span>
-      <span><i style="background:rgba(42,120,214,.5)"></i><i style="background:transparent;border:1px solid var(--line)"></i><i style="background:rgba(235,104,52,.5)"></i>気温（18℃を基準に、寒いと青・暑いと橙）</span>
-    </p>
-  </section>
+  <!-- くわしい欄は1つずつ（まとめの項目を押しても、その欄に切りかわる） -->
+  <div class="ls-tabs" id="tabs" role="tablist" aria-label="くわしく見る">
+    <button type="button" class="ls-tab" role="tab" id="tab-wave" data-tab="wave" aria-controls="sec-wave">波</button>
+    <button type="button" class="ls-tab" role="tab" id="tab-tide" data-tab="tide" aria-controls="sec-tide">潮</button>
+    <button type="button" class="ls-tab" role="tab" id="tab-wind" data-tab="wind" aria-controls="sec-wind">風</button>
+    <button type="button" class="ls-tab" role="tab" id="tab-weather" data-tab="weather" aria-controls="sec-weather">天気</button>
+  </div>
 
-  <section class="card" id="sec-wave">
+  <section class="card" id="sec-wave" role="tabpanel" aria-labelledby="tab-wave">
     <div class="sec-head">
       <h2><span class="ls-icon is-text" data-icon="waves" aria-hidden="true"></span>波の高さ</h2>
       <div class="seg" role="group" aria-label="波の向きの出し方">
@@ -81,7 +78,14 @@
     <div id="waves"></div>
   </section>
 
-  <section class="card" id="sec-wind">
+  <section class="card" id="sec-tide" role="tabpanel" aria-labelledby="tab-tide">
+    <h2><span class="ls-icon is-text" data-icon="moon" aria-hidden="true"></span>潮の満ち引き</h2>
+    <ul class="legend" id="tide-legend"></ul>
+    <div class="chart" id="tide-chart"></div>
+    <div class="tides" id="tide-list"></div>
+  </section>
+
+  <section class="card" id="sec-wind" role="tabpanel" aria-labelledby="tab-wind">
     <div class="sec-head">
       <h2><span class="ls-icon is-text" data-icon="wind" aria-hidden="true"></span>風の強さ</h2>
       <div class="seg" role="group" aria-label="風の向きの出し方（波もいっしょに変わる）">
@@ -97,11 +101,15 @@
     <div id="wind-tl"></div>
   </section>
 
-  <section class="card" id="sec-tide">
-    <h2><span class="ls-icon is-text" data-icon="moon" aria-hidden="true"></span>潮の満ち引き</h2>
-    <ul class="legend" id="tide-legend"></ul>
-    <div class="chart" id="tide-chart"></div>
-    <div class="tides" id="tide-list"></div>
+  <section class="card" id="sec-weather" role="tabpanel" aria-labelledby="tab-weather">
+    <h2><span class="ls-icon is-text" data-icon="cloud-sun" aria-hidden="true"></span>天気と降水確率</h2>
+    <div id="wx-jma"></div>
+    <h3 class="small sub" style="margin:16px 0 0;font-weight:700">1時間ごと（横にスクロール）</h3>
+    <div id="wx-tl"></div>
+    <p class="wx-key">
+      <span><i style="background:rgba(42,120,214,.2)"></i><i style="background:rgba(42,120,214,.5)"></i><i style="background:rgba(42,120,214,.85)"></i>降水確率・雨（濃いほど高い・多い）</span>
+      <span><i style="background:rgba(42,120,214,.5)"></i><i style="background:transparent;border:1px solid var(--line)"></i><i style="background:rgba(235,104,52,.5)"></i>気温（18℃を基準に、寒いと青・暑いと橙）</span>
+    </p>
   </section>
 
   <section class="card">
