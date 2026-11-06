@@ -43,7 +43,8 @@ export function drawChart(el, { series, bands = [], marks = [], yFloor = null, u
       d += `${pen ? "L" : "M"}${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`;
       pen = true;
     });
-    if (d) g += `<path d="${d}" fill="none" stroke="var(${s.color})" stroke-width="${mini ? 1.5 : 2}" stroke-linejoin="round" stroke-linecap="round"/>`;
+    // dash … 同じ機関の2つ目の計算（同じ色の点線）
+    if (d) g += `<path d="${d}" fill="none" stroke="var(${s.color})" stroke-width="${mini ? 1.5 : 2}" stroke-linejoin="round" stroke-linecap="round"${s.dash ? ` stroke-dasharray="${mini ? "3 3" : "5 4"}"` : ""}/>`;
   });
   // 満潮・干潮などの印（字は字の色）
   marks.forEach(k => {
@@ -84,8 +85,14 @@ export function drawChart(el, { series, bands = [], marks = [], yFloor = null, u
   svg.addEventListener("pointerdown", pick);
   svg.addEventListener("pointermove", ev => { if (ev.pointerType === "mouse" || ev.buttons) pick(ev); });
 }
+// 点線の見本（同じ機関の2つ目の計算）
+export const dashSwatch = color => `<svg class="sw-dash" width="18" height="4" viewBox="0 0 18 4" aria-hidden="true"><line x1="1" y1="2" x2="17" y2="2" stroke="var(${color})" stroke-width="2" stroke-linecap="round" stroke-dasharray="4 4"/></svg>`;
+
+// items … { label, color, kind（band 夜・dash 灰色の点線）, dash（線の色の点線） }
 export function legend(el, items) {
-  el.innerHTML = items.map(it => `<li><span class="sw ${it.kind || ""}" ${it.color ? `style="background:var(${it.color})"` : ""}></span>${it.label}</li>`).join("");
+  el.innerHTML = items.map(it => it.dash
+    ? `<li>${dashSwatch(it.color)}${it.label}</li>`
+    : `<li><span class="sw ${it.kind || ""}" ${it.color ? `style="background:var(${it.color})"` : ""}></span>${it.label}</li>`).join("");
 }
 
 

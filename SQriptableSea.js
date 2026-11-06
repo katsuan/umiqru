@@ -8,7 +8,7 @@
 // 新しい版が出ると通知で知らせます。入れかえ方は https://katsuan.github.io/umiqru/#howto
 // ======================================
 
-const SEA_BUILD = "d6315b2d27";
+const SEA_BUILD = "3b21ca59ba";
 
 const PALETTE = {
   brand: "#6C47FF",
@@ -875,13 +875,13 @@ const SEA = {
     { key: "ecmwf_wam025", label: "WAM", color: "#2A78D6" },
     { key: "ncep_gfswave025", label: "GFS", color: "#EB6834" },
     { key: "meteofrance_wave", label: "MFWAM", color: "#1BAF7A" },
-    { key: "ncep_gfswave016", label: "GFS細", color: "#EDA100" },
+    { key: "ncep_gfswave016", label: "GFS細", color: "#EB6834", dash: true },
   ],
   winds: [
-    { key: "jma_msm", label: "MSM", color: "#008300" },
-    { key: "jma_gsm", label: "GSM", color: "#2A78D6" },
-    { key: "ecmwf_ifs025", label: "IFS", color: "#EB6834" },
-    { key: "gfs_seamless", label: "GFS", color: "#6250D6" },
+    { key: "jma_msm", label: "MSM", color: "#6250D6" },
+    { key: "jma_gsm", label: "GSM", color: "#6250D6", dash: true },
+    { key: "gfs_seamless", label: "GFS", color: "#EB6834" },
+    { key: "ecmwf_ifs025", label: "IFS", color: "#2A78D6" },
   ],
   tideColor: "#E87BA4",
   warnNames: {
@@ -1201,8 +1201,35 @@ function seaGraph(w, h, { series, from, i, theme, refs = [], bands = [], marks =
   pts.forEach((list, k) => {
     if (list.length < 2) return;
     const path = new Path();
-    path.move(new Point(X(list[0].x), Y(list[0].y)));
-    list.slice(1).forEach((p) => path.addLine(new Point(X(p.x), Y(p.y))));
+    const xy = list.map((p) => [X(p.x), Y(p.y)]);
+    if (series[k].dash) {
+      let on = true;
+      let left = 4;
+      for (let n = 1; n < xy.length; n++) {
+        let [x0, y0] = xy[n - 1];
+        const [x1, y1] = xy[n];
+        let len = Math.hypot(x1 - x0, y1 - y0);
+        while (len > 1e-6) {
+          const step = Math.min(left, len);
+          const xs = x0 + ((x1 - x0) * step) / len;
+          const ys = y0 + ((y1 - y0) * step) / len;
+          if (on) {
+            path.move(new Point(x0, y0));
+            path.addLine(new Point(xs, ys));
+          }
+          [x0, y0] = [xs, ys];
+          len -= step;
+          left -= step;
+          if (left <= 1e-6) {
+            on = !on;
+            left = on ? 4 : 3;
+          }
+        }
+      }
+    } else {
+      path.move(new Point(xy[0][0], xy[0][1]));
+      xy.slice(1).forEach(([x, y]) => path.addLine(new Point(x, y)));
+    }
     dc.addPath(path);
     dc.setStrokeColor(paint.line(series[k].color));
     dc.setLineWidth(series.length > 1 ? 1.5 : 2);
@@ -1239,7 +1266,7 @@ function seaLegend(box, title, items, size, theme, w) {
     if (need > room) return;
     room -= need;
     const dot = canvas(it.dash ? 10 : 6, 6);
-    dot.setFillColor(it.dash ? seaPaint(theme).ref : seaPaint(theme).line(it.color));
+    dot.setFillColor(it.dash && !it.color ? seaPaint(theme).ref : seaPaint(theme).line(it.color));
     if (it.dash) [0, 4, 8].forEach((x) => dot.fillRect(new Rect(x, 2.25, 2, 1.5)));
     else dot.fillEllipse(new Rect(0, 0, 6, 6));
     const v = row.addImage(dot.getImage());
@@ -1356,6 +1383,8 @@ defineCard("sea", {
   },
   render(box, d, ctx) {
     const { theme, tier, now, w, h } = ctx;
+    const look = (list, conf) => conf.map((c) => ({ ...(list.find((m) => m.key === c.key) || { v: [], dir: [] }), ...c }));
+    d = { ...d, waves: look(d.waves, SEA.waves), winds: look(d.winds, SEA.winds) };
     const view = seaWindow(d, now);
     const i = view.i;
     const wv = seaRange(d.waves, i);

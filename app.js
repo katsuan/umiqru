@@ -9,14 +9,14 @@ import { findPlace, km, placeContext } from "./js/place.js";
 import { loadForecasts, loadTide, tideFor } from "./js/forecast.js";
 import { jmaWarnings } from "./js/jma.js";
 import { arrow, dirName, esc, fmt, rainCell, rainMmCell, range, tempCell, valueAt, wxName, wxShort } from "./js/format.js";
-import { drawChart, legend, timeline, tlScroll } from "./js/chart.js";
+import { dashSwatch, drawChart, legend, timeline, tlScroll } from "./js/chart.js";
 
 // ---- 線 ----
 function windSeries(d) {
   const h = d.wind?.hourly;
   if (!h) return [];
   return WIND_MODELS.map(k => ({
-    key: k, label: SOURCES[k].label, color: SOURCES[k].color,
+    key: k, label: SOURCES[k].label, color: SOURCES[k].color, dash: !!SOURCES[k].dash,
     points: hourlyPoints(h[`wind_speed_10m_${k}`], state.day),
     dir: sliceDay(h[`wind_direction_10m_${k}`], state.day),
     rain: sliceDay(h[`precipitation_${k}`], state.day),
@@ -26,7 +26,7 @@ function waveSeries(d) {
   const h = d.waves?.hourly;
   if (!h) return [];
   return WAVE_MODELS.map(k => ({
-    key: k, label: SOURCES[k].label, color: SOURCES[k].color,
+    key: k, label: SOURCES[k].label, color: SOURCES[k].color, dash: !!SOURCES[k].dash,
     points: hourlyPoints(h[`wave_height_${k}`], state.day),
     period: sliceDay(h[`wave_period_${k}`], state.day),
     dir: sliceDay(h[`wave_direction_${k}`], state.day),
@@ -91,7 +91,7 @@ function render() {
   const waves = waveSeries(d);
   const off = d.offshore || {};
   const nightKey = bands.length ? [{ label: "夜", kind: "band" }] : [];
-  legend(document.getElementById("wave-legend"), [...waves.map(s => ({ label: s.label, color: s.color })), ...nightKey]);
+  legend(document.getElementById("wave-legend"), [...waves.map(s => ({ label: s.label, color: s.color, dash: s.dash })), ...nightKey]);
   drawChart(document.getElementById("wave-chart"), { series: waves, bands, yFloor: 0, unit: "m" });
   document.getElementById("wave-table").innerHTML = `
     <thead><tr><th>${h}時</th><th class="num">波 m</th><th class="num">周期 秒</th><th class="num">うねり m</th><th>来る向き</th></tr></thead>
@@ -103,7 +103,7 @@ function render() {
 
   // 風（気象庁の2つの計算）
   const wind = windSeries(d);
-  legend(document.getElementById("wind-legend"), [...wind.map(s => ({ label: s.label, color: s.color })), ...nightKey]);
+  legend(document.getElementById("wind-legend"), [...wind.map(s => ({ label: s.label, color: s.color, dash: s.dash })), ...nightKey]);
   drawChart(document.getElementById("wind-chart"), { series: wind, bands, yFloor: 0, unit: "m/s" });
   document.getElementById("wind-table").innerHTML = `
     <thead><tr><th>${h}時</th><th class="num">風速 m/s</th><th>吹いてくる向き</th></tr></thead>
@@ -371,7 +371,7 @@ function init() {
     </ul>
     <p>予報は計算のめやすです。航海には使えません。海に出るかどうかは、${NAMES.jma}の警報・注意報と現地のようすで決めてください。</p>`;
   // 波・風のグラフの下の「それぞれの予報」
-  const modelItem = k => `<li><i style="background:var(${SOURCES[k].color})"></i><b>${SOURCES[k].label}</b>${esc(SOURCES[k].org)}の${esc(SOURCES[k].full)}。マス目 ${SOURCES[k].grid}</li>`;
+  const modelItem = k => `<li>${SOURCES[k].dash ? dashSwatch(SOURCES[k].color) : `<i style="background:var(${SOURCES[k].color})"></i>`}<b>${SOURCES[k].label}</b>${esc(SOURCES[k].org)}の${esc(SOURCES[k].full)}。マス目 ${SOURCES[k].grid}</li>`;
   document.querySelector("#wave-models ul").innerHTML = WAVE_MODELS.map(modelItem).join("") + `<li><i class="dash"></i><b>${NAMES.jma}</b>府県天気予報の波の文（数字の予報は無料で出ていないので、文の高さを点線で重ねる）</li>`;
   document.querySelector("#wind-models ul").innerHTML = WIND_MODELS.map(modelItem).join("");
 
