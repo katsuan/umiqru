@@ -4,15 +4,16 @@ import { NAMES } from "./names.js";
 
 export const SOURCES = {
   // 波（世界の予報。日本の無料の数字の波予報はない）
-  ecmwf_wam025:     { label: "欧州", full: "ECMWF WAM", color: "--s-ecmwf" },
-  ncep_gfswave025:  { label: "米国", full: "NOAA GFS-Wave 0.25°", color: "--s-gfs" },
-  meteofrance_wave: { label: "フランス", full: "Météo-France MFWAM", color: "--s-mf" },
-  ncep_gfswave016:  { label: "米国・細", full: "NOAA GFS-Wave 0.16°", color: "--s-gfs16" },
+  // org … 作っている機関、grid … 計算のマス目のおよその細かさ（「それぞれの予報」の欄と出どころに出す）
+  ecmwf_wam025:     { label: "欧州", full: "WAM", org: "ECMWF（ヨーロッパ中期予報センター）", grid: "約25km", color: "--s-ecmwf" },
+  ncep_gfswave025:  { label: "米国", full: "GFS-Wave（0.25°）", org: "NOAA（米国海洋大気庁）", grid: "約25km", color: "--s-gfs" },
+  meteofrance_wave: { label: "フランス", full: "MFWAM", org: "Météo-France（フランス気象局）", grid: "約8km", color: "--s-mf" },
+  ncep_gfswave016:  { label: "米国・細", full: "GFS-Wave（0.16°）", org: "NOAA（米国海洋大気庁）", grid: "約16km", color: "--s-gfs16" },
   // 風
-  jma_msm:      { label: "気象庁MSM", full: "気象庁 MSM（日本のまわり・約3日半先まで）", color: "--s-jma" },
-  jma_gsm:      { label: "気象庁GSM", full: "気象庁 GSM（世界・7日先まで）", color: "--s-ecmwf" },
-  ecmwf_ifs025: { label: "欧州", full: "ECMWF IFS", color: "--s-gfs" },
-  gfs_seamless: { label: "米国", full: "NOAA GFS", color: "--s-icon" },
+  jma_msm:      { label: "気象庁MSM", full: "MSM（日本のまわり・約3日半先まで）", org: "気象庁", grid: "約5km", color: "--s-jma" },
+  jma_gsm:      { label: "気象庁GSM", full: "GSM（世界・7日先まで）", org: "気象庁", grid: "約20km", color: "--s-ecmwf" },
+  ecmwf_ifs025: { label: "欧州", full: "IFS", org: "ECMWF（ヨーロッパ中期予報センター）", grid: "約25km", color: "--s-gfs" },
+  gfs_seamless: { label: "米国", full: "GFS", org: "NOAA（米国海洋大気庁）", grid: "約13〜25km", color: "--s-icon" },
   // 潮
   tide736: { label: "潮汐表", full: "海上保安庁の調和定数で計算", color: "--s-tide736" },
   om_sea:  { label: "海面の予報", full: "", color: "--s-omsea" },

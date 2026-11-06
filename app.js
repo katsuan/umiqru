@@ -346,11 +346,24 @@ function init() {
     render();
   });
 
+  // 出どころ：1つの出どころを1行に
+  const modelRow = (k, kind) => `<li><b>${kind}「${SOURCES[k].label}」</b>${esc(SOURCES[k].org)}の${esc(SOURCES[k].full)}（マス目 ${SOURCES[k].grid}）</li>`;
   document.getElementById("credits").innerHTML = `
-    出どころ：<a href="https://www.jma.go.jp/bosai/" rel="noopener">${NAMES.jma}</a>（府県天気予報の天気・風・波・降水確率、警報と注意報）、
-    <a href="https://tide736.net/" rel="noopener">${NAMES.tide736}</a>（${SOURCES.tide736.full}）、${NAMES.gsi}（場所から市区町村）、
-    <a href="https://open-meteo.com/" rel="noopener">${NAMES.openMeteo}</a>（CC BY 4.0。緯度経度で読む予報。波：${WAVE_MODELS.map(k => SOURCES[k].full).join("、")}／風：${WIND_MODELS.map(k => SOURCES[k].full).join("、")}／水温・海面高度・地名さがし）。<br>
-    予報は計算のめやすです。航海には使えません。海に出るかどうかは、${NAMES.jma}の警報・注意報と現地のようすで決めてください。`;
+    <p class="credits-head">出どころ</p>
+    <ul class="credits">
+      <li><b><a href="https://www.jma.go.jp/bosai/" rel="noopener">${NAMES.jma}</a></b>府県天気予報の天気・風・波・降水確率、警報と注意報</li>
+      <li><b><a href="https://tide736.net/" rel="noopener">${NAMES.tide736}</a></b>潮汐表（${SOURCES.tide736.full}）</li>
+      ${WAVE_MODELS.map(k => modelRow(k, "波")).join("")}
+      ${WIND_MODELS.map(k => modelRow(k, "風")).join("")}
+      <li><b><a href="https://open-meteo.com/" rel="noopener">${NAMES.openMeteo}</a></b>上の波・風の予報（気象庁の MSM・GSM も）と、天気・水温・海面の高さ・地名さがしを、緯度経度で読む（CC BY 4.0）</li>
+      <li><b>${NAMES.gsi}</b>場所から市区町村（気象庁の地域を決める）</li>
+    </ul>
+    <p>予報は計算のめやすです。航海には使えません。海に出るかどうかは、${NAMES.jma}の警報・注意報と現地のようすで決めてください。</p>`;
+  // 波・風のグラフの下の「それぞれの予報」
+  const modelItem = k => `<li><i style="background:var(${SOURCES[k].color})"></i><b>${SOURCES[k].label}</b>${esc(SOURCES[k].org)}の${esc(SOURCES[k].full)}。マス目 ${SOURCES[k].grid}</li>`;
+  document.querySelector("#wave-models ul").innerHTML = WAVE_MODELS.map(modelItem).join("") + `<li><i class="dash"></i><b>${NAMES.jma}</b>府県天気予報の波の文（数字の予報は無料で出ていないので、文の高さを点線で重ねる）</li>`;
+  document.querySelector("#wind-models ul").innerHTML = WIND_MODELS.map(modelItem).join("");
+
 
   let t;
   window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(render, 150); });

@@ -177,3 +177,19 @@ table.jma-days tr.pop.on td:first-child { font-weight: 700; color: var(--text); 
 /* 線アイコン（Q キットの ls-icon）。見出しの字と同じ色、まとめの項目は うすい字の色 */
 h2 .ls-icon, .facts dt .ls-icon { vertical-align: -0.15em; }
 .alert .ls-icon { flex: 0 0 auto; margin-top: 3px; color: var(--text-2); }
+
+/* 出どころ：1つを1行に、左の頭から */
+.credits-head { margin: 0 0 4px; font-weight: 700; color: var(--text-2); }
+ul.credits { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 2px; }
+ul.credits li { padding-left: 0; }
+ul.credits b { font-weight: 700; color: var(--text-2); margin-right: 8px; }
+footer p { margin: 0; }
+
+/* それぞれの予報（波・風のグラフの下） */
+details.models { margin-top: 8px; font-size: 13px; color: var(--text-2); }
+details.models summary { cursor: pointer; color: var(--text-3); }
+details.models ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
+details.models li { display: grid; grid-template-columns: 16px auto minmax(0, 1fr); gap: 8px; align-items: baseline; }
+details.models li i { width: 16px; height: 2px; border-radius: 1px; align-self: center; }
+details.models li i.dash { height: 0; border-top: 2px dashed var(--text-3); background: none; }
+details.models li b { white-space: nowrap; color: var(--text); }
