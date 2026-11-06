@@ -49,15 +49,17 @@
   <p class="status" id="status" aria-live="polite"></p>
   <div id="alert"></div>
 
-  <section class="card" id="summary"></section>
-
-  <!-- くわしい欄は1つずつ（まとめの項目を押しても、その欄に切りかわる） -->
-  <div class="ls-tabs" id="tabs" role="tablist" aria-label="くわしく見る">
+  <!-- まとめ（ウィジェットと同じ見え方）とくわしい欄を1つずつ。まとめの項目を押すと、その欄に切りかわる -->
+  <div class="ls-tabs" id="tabs" role="tablist" aria-label="見るもの">
+    <button type="button" class="ls-tab" role="tab" id="tab-summary" data-tab="summary" aria-controls="summary">まとめ</button>
     <button type="button" class="ls-tab" role="tab" id="tab-wave" data-tab="wave" aria-controls="sec-wave">波</button>
     <button type="button" class="ls-tab" role="tab" id="tab-tide" data-tab="tide" aria-controls="sec-tide">潮</button>
     <button type="button" class="ls-tab" role="tab" id="tab-wind" data-tab="wind" aria-controls="sec-wind">風</button>
     <button type="button" class="ls-tab" role="tab" id="tab-weather" data-tab="weather" aria-controls="sec-weather">天気</button>
   </div>
+
+  <section class="card" id="summary" role="tabpanel" aria-labelledby="tab-summary"></section>
+
 
   <section class="card" id="sec-wave" role="tabpanel" aria-labelledby="tab-wave">
     <div class="sec-head">

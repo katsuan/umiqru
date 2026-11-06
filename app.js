@@ -20,7 +20,14 @@ function windSeries(d) {
     points: hourlyPoints(h[`wind_speed_10m_${k}`], state.day),
     dir: sliceDay(h[`wind_direction_10m_${k}`], state.day),
     rain: sliceDay(h[`precipitation_${k}`], state.day),
+    gust: sliceDay(h[`wind_gusts_10m_${k}`], state.day), // 突風（GFS・IFS だけ）
   }));
+}
+// 沖の海流（Open-Meteo の km/h をノットに）。dir … 流れていく向き
+function currentAt(d, h) {
+  const v = sliceDay(d.sea?.hourly?.ocean_current_velocity, state.day)[h];
+  const dir = sliceDay(d.sea?.hourly?.ocean_current_direction, state.day)[h];
+  return v == null ? null : { kn: v / 1.852, dir };
 }
 function waveSeries(d) {
   const h = d.waves?.hourly;
@@ -106,15 +113,18 @@ function render() {
 
   // 風（気象庁の2つの計算）
   const wind = windSeries(d);
+  // アメダスの実況は、今日を見ているときだけ
+  const amedas = state.day === 0 ? d.amedas : null;
   legend(document.getElementById("wind-legend"), [...wind.map(s => ({ label: s.label, color: s.color, dash: s.dash })), ...nightKey]);
   drawChart(document.getElementById("wind-chart"), { series: wind, bands, yFloor: 0, unit: "m/s", waiting: windWait });
   document.getElementById("wind-table").innerHTML = `
-    <thead><tr><th>${h}時</th><th class="num">風速 m/s</th><th>吹いてくる向き</th></tr></thead>
+    <thead><tr><th>${h}時</th><th class="num">風速 m/s</th><th class="num">突風 m/s</th><th>吹いてくる向き</th></tr></thead>
     <tbody>${wind.map(s => `<tr>
       <th><span class="key"><i style="background:var(${s.color})"></i>${s.label}</span></th>
-      <td class="num">${fmt(valueAt(s, h))}</td>
+      <td class="num">${fmt(valueAt(s, h))}</td><td class="num">${fmt(s.gust[h])}</td>
       <td>${arrow(s.dir[h])} ${windDirText(s.dir[h])}</td></tr>`).join("")}
-      <tr><th>文の予報</th><td colspan="2" class="wrap">${text?.wind ? esc(text.wind) : `<span class="muted">${state.day <= 2 ? "なし" : "3日先まで"}</span>`}</td></tr>
+      ${amedas ? `<tr><th>実況</th><td colspan="3" class="wrap">${NAMES.amedas} ${esc(amedas.name)}（${amedas.km.toFixed(0)}km・${esc(amedas.time)}）　${amedas.wind == null ? "—" : `${arrow(amedas.dir)} ${windDirText(amedas.dir)} ${fmt(amedas.wind)} m/s`}${amedas.temp == null ? "" : `・${fmt(amedas.temp)}℃`}</td></tr>` : ""}
+      <tr><th>文の予報</th><td colspan="3" class="wrap">${text?.wind ? esc(text.wind) : `<span class="muted">${state.day <= 2 ? "なし" : "3日先まで"}</span>`}</td></tr>
     </tbody>`;
   timeline("wind-tl", wind, 1, windDirText);
   document.querySelectorAll("[data-dir]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.dir === state.windDir)));
@@ -142,9 +152,11 @@ function render() {
   ]);
   drawChart(document.getElementById("tide-chart"), { series: tideS, bands, marks, unit: "cm（平均からの差）", endLabels: false, waiting: tideWait });
   const tideDiff = tideRange(tide);
+  const cur = currentAt(d, h);
+  const curText = cur ? `${cur.dir == null ? "" : `${windDirText(cur.dir)}へ `}${fmt(cur.kn)}ノット` : "";
   const tideTimes = list => list.map(t => `${esc(t.time)}（${Math.round(t.cm)}cm）`).join("・") || "—";
   document.getElementById("tide-list").innerHTML = tide
-    ? `<span>満潮 ${tideTimes(tide.flood)}</span><span>干潮 ${tideTimes(tide.edd)}</span><span>${esc(tide.moon.title)}（月齢 ${esc(tide.moon.age)}）</span>${tideDiff ? `<span>${tideDiff}</span>` : ""}`
+    ? `<span>満潮 ${tideTimes(tide.flood)}</span><span>干潮 ${tideTimes(tide.edd)}</span><span>${esc(tide.moon.title)}（月齢 ${esc(tide.moon.age)}）</span>${tideDiff ? `<span>${tideDiff}</span>` : ""}${cur ? `<span>沖の流れ ${curText}（${h}時・${NAMES.openMeteo}）</span>` : ""}`
     : `<span class="muted">${ctx.port ? (tideWaiting(day.ymd) ? "読みこみ中…" : "潮汐表を読めませんでした") : `潮汐表は日本の港（${PORT_MAX_KM}km 以内）だけです`}</span>`;
 
   // 天気：気象庁の文と6時間ごとの降水確率（3日先まで）、1時間ごとの表
@@ -188,6 +200,8 @@ function render() {
   const pop = d.pops.find(p => p.ymd === day.ymd && h >= p.from && h < p.from + 6);
   const r = range(wind.map(s => valueAt(s, h)));
   const windDir = wind.map(s => s.dir[h]).find(v => v != null);
+  const gusts = wind.map(s => s.gust[h]).filter(v => v != null);
+  const gustMax = gusts.length ? Math.max(...gusts) : null;
   const events = tideEvents(tide, hm);
   // つぎの満潮・干潮。その日にもうなければ、つぎの日のいちばん早いもの（「あす 満潮 4:57」）
   let nextTide = events.find(t => hm(t.time) >= h) || null;
@@ -211,10 +225,10 @@ function render() {
     <div class="facts">
       <a class="fact" href="#sec-wave"><span class="dt"><span class="ls-icon is-text" data-icon="waves" aria-hidden="true"></span>波（4つの予報）</span><span class="dd">${wr ? (wr.n > 1 && wr.hi - wr.lo >= 0.05 ? `${fmt(wr.lo)}〜${fmt(wr.hi)}` : fmt(wr.hi)) : "—"}<span class="unit">m</span><span class="note">${wr && wr.n > 1 ? `いちばん大きい差 ${fmt(wr.hi - wr.lo)} m` : ""}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
       <a class="fact" href="#waves"><span class="dt"><span class="ls-icon is-text" data-icon="waves" aria-hidden="true"></span>波（${NAMES.jma}）</span><span class="dd">${waveTop == null ? "—" : fmt(waveTop)}<span class="unit">${waveTop == null ? "" : "m まで"}</span><span class="note">${text?.wave ? esc(text.wave) : (!ctx.jma ? "日本だけ" : state.day > 2 ? "3日先まで" : "")}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
-      <a class="fact" href="#sec-wind"><span class="dt"><span class="ls-icon is-text" data-icon="wind" aria-hidden="true"></span>風（${wind.filter(s => valueAt(s, h) != null).length}つの予報）</span><span class="dd">${r ? (r.n > 1 && r.hi - r.lo >= 0.05 ? `${fmt(r.lo)}〜${fmt(r.hi)}` : fmt(r.hi)) : "—"}<span class="unit">m/s</span><span class="note">${windDir != null ? (state.windDir === "deg" ? `向き ${windDirText(windDir)}` : `${dirName(windDir)}の風`) : ""}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
+      <a class="fact" href="#sec-wind"><span class="dt"><span class="ls-icon is-text" data-icon="wind" aria-hidden="true"></span>風（${wind.filter(s => valueAt(s, h) != null).length}つの予報）</span><span class="dd">${r ? (r.n > 1 && r.hi - r.lo >= 0.05 ? `${fmt(r.lo)}〜${fmt(r.hi)}` : fmt(r.hi)) : "—"}<span class="unit">m/s</span><span class="note">${windDir != null ? (state.windDir === "deg" ? `向き ${windDirText(windDir)}` : `${dirName(windDir)}の風`) : ""}${gustMax != null ? `<br>突風 ${fmt(gustMax, 0)} m/s まで` : ""}${amedas?.wind != null ? `<br>実況 ${fmt(amedas.wind)} m/s（${esc(amedas.name)} ${esc(amedas.time)}）` : ""}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
       <a class="fact" href="#sec-tide"><span class="dt"><span class="ls-icon is-text" data-icon="moon" aria-hidden="true"></span>潮</span><span class="dd">${tide ? esc(tide.moon.title) : "—"}<span class="note">${!tide ? (tideWaiting(day.ymd) ? "読みこみ中…" : ctx.port ? "読めませんでした" : "日本の港だけ") : nextTide ? `${tideDiff ? `${tideDiff}<br>` : ""}つぎ ${nextTide.when || ""}${nextTide.k} ${esc(nextTide.time)}` : "満潮・干潮の時刻を読めませんでした"}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
       <a class="fact" href="#sec-tide"><span class="dt"><span class="ls-icon is-text" data-icon="sunrise" aria-hidden="true"></span>朝まづめ（めやす）</span><span class="dd">${mz ? `${hmText(mz.morning[0])}〜${hmText(mz.morning[1])}` : "—"}<span class="note">${mz ? `夕まづめ ${hmText(mz.evening[0])}〜${hmText(mz.evening[1])}` : "日本の港だけ"}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
-      <a class="fact" href="#sec-wave"><span class="dt"><span class="ls-icon is-text" data-icon="thermometer" aria-hidden="true"></span>水温</span><span class="dd">${fmt(sst)}<span class="unit">℃</span><span class="note">${NAMES.openMeteo}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
+      <a class="fact" href="#sec-wave"><span class="dt"><span class="ls-icon is-text" data-icon="thermometer" aria-hidden="true"></span>水温</span><span class="dd">${fmt(sst)}<span class="unit">℃</span><span class="note">${cur ? `沖の流れ ${curText}` : NAMES.openMeteo}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
       <a class="fact" href="#sec-weather"><span class="dt"><span class="ls-icon is-text" data-icon="cloud-sun" aria-hidden="true"></span>天気（${h}時）</span><span class="dd text">${wh ? esc(wxName(sliceDay(wh.weather_code, state.day)[h])) : "—"}<span class="note">${wh && sliceDay(wh.precipitation_probability, state.day)[h] != null ? `降水確率 ${sliceDay(wh.precipitation_probability, state.day)[h]}%` : ""}${pop ? `・${NAMES.jma} ${esc(pop.pop)}%（${pop.from}〜${pop.from + 6}時）` : ""}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
     </div>`;
   // ウィジェットと同じ小さいグラフ（押すと詳しい欄へ）
@@ -244,7 +258,7 @@ async function go(place) {
     drawHowto();
     await refreshTide();
     // MSM は日本のまわりだけなので、日本の外では読めなくてよい
-    const names = { wx: "天気", wind: "風", msm: state.ctx.jma ? "風（MSM）" : null, waves: "波", sea: "水温・海面", jma: `${NAMES.jma}の予報`, warn: `${NAMES.jma}の警報` };
+    const names = { wx: "天気", wind: "風", msm: state.ctx.jma ? "風（MSM）" : null, waves: "波", sea: "水温・海流・海面", jma: `${NAMES.jma}の予報`, amedas: NAMES.amedas, warn: `${NAMES.jma}の警報` };
     const errs = data.errors.map(k => names[k]).filter(Boolean);
     statusEl().textContent = errs.length ? `読めなかったもの：${errs.join("・")}` : "";
   } catch (e) {
@@ -325,9 +339,10 @@ function drawHowto() {
 }
 
 // ---- くわしい欄のタブ ----
-// ウィジェットと同じ並び（波・潮・風・天気）
-const TABS = ["wave", "tide", "wind", "weather"];
-// key の欄だけを出す。scroll … タブの帯が見えるところまで送る（まとめの項目を押したとき）
+// まとめ（ダッシュボード）が先頭。くわしい欄はウィジェットと同じ並び（波・潮・風・天気）
+const TABS = ["summary", "wave", "tide", "wind", "weather"];
+const panelOf = k => document.getElementById(k === "summary" ? "summary" : `sec-${k}`);
+// key の欄だけを出す。scroll … true ならタブの帯、id ならその段が見えるところまで送る（まとめの項目を押したとき）
 function showTab(key, scroll = false) {
   if (!TABS.includes(key)) key = TABS[0];
   TABS.forEach(k => {
@@ -335,14 +350,16 @@ function showTab(key, scroll = false) {
     const tab = document.getElementById(`tab-${k}`);
     tab.setAttribute("aria-selected", String(on));
     tab.tabIndex = on ? 0 : -1;
-    document.getElementById(`sec-${k}`).hidden = !on;
+    panelOf(k).hidden = !on;
   });
   store.set("umiqru:tab", key);
   // 隠れていた欄は幅が0なので、出してから描き直す。横スクロールの表は、えらんだ時刻まで送りなおす
   Object.keys(tlScroll).forEach(id => delete tlScroll[id]);
   render();
-  if (scroll) document.getElementById("tabs").scrollIntoView({ block: "start" });
+  // 描き直しで高さが変わったあとで送る。すぐに送ると、途中で止まることがある
+  if (scroll) scrollToEl(typeof scroll === "string" ? scroll : "tabs");
 }
+const scrollToEl = id => setTimeout(() => document.getElementById(id).scrollIntoView({ block: "start" }), 50);
 function initTabs() {
   const bar = document.getElementById("tabs");
   bar.addEventListener("click", ev => { const b = ev.target.closest("[data-tab]"); if (b) showTab(b.dataset.tab); });
@@ -356,10 +373,14 @@ function initTabs() {
   });
   // まとめの項目（#sec-wave など）を押したら、その欄に切りかえてタブの帯まで
   document.getElementById("summary").addEventListener("click", ev => {
-    const a = ev.target.closest('a[href^="#sec-"]');
+    const a = ev.target.closest('a[href^="#"]');
     if (!a) return;
+    const href = a.getAttribute("href");
+    // #sec-wave … その欄へ。#waves … 波の欄の中の、気象庁の波の段へ
+    const key = href.startsWith("#sec-") ? href.slice(5) : href === "#waves" ? "wave" : null;
+    if (!key) return;
     ev.preventDefault();
-    showTab(a.getAttribute("href").slice(5), true);
+    showTab(key, href === "#waves" ? "waves" : true);
   });
   const fromHash = location.hash.startsWith("#sec-") ? location.hash.slice(5) : null;
   showTab(fromHash || store.get("umiqru:tab") || TABS[0], !!fromHash);
@@ -408,11 +429,11 @@ function init() {
   document.getElementById("credits").innerHTML = `
     <p class="credits-head">出どころ</p>
     <ul class="credits">
-      <li><b><a href="https://www.jma.go.jp/bosai/" rel="noopener">${NAMES.jma}</a></b>府県天気予報の天気・風・波・降水確率、警報と注意報</li>
+      <li><b><a href="https://www.jma.go.jp/bosai/" rel="noopener">${NAMES.jma}</a></b>府県天気予報の天気・風・波・降水確率、警報と注意報、アメダスのいまの観測（風・気温）</li>
       <li><b><a href="https://tide736.net/" rel="noopener">${NAMES.tide736}</a></b>潮汐表（${SOURCES.tide736.full}）</li>
       ${WAVE_MODELS.map(k => modelRow(k, "波")).join("")}
       ${WIND_MODELS.map(k => modelRow(k, "風")).join("")}
-      <li><b><a href="https://open-meteo.com/" rel="noopener">${NAMES.openMeteo}</a></b>上の波・風の予報（気象庁の MSM・GSM も）と、天気・水温・海面の高さ・地名さがしを、緯度経度で読む（CC BY 4.0）</li>
+      <li><b><a href="https://open-meteo.com/" rel="noopener">${NAMES.openMeteo}</a></b>上の波・風の予報（気象庁の MSM・GSM も）と、突風（GFS・IFS）・天気・水温・沖の海流・海面の高さ・地名さがしを、緯度経度で読む（CC BY 4.0）</li>
       <li><b>${NAMES.gsi}</b>場所から市区町村（気象庁の地域を決める）</li>
     </ul>
     <p>予報は計算のめやすです。航海には使えません。海に出るかどうかは、${NAMES.jma}の警報・注意報と現地のようすで決めてください。</p>`;

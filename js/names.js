@@ -6,6 +6,7 @@ export const NAMES = {
   en: "UmiQru",
   copy: "海のごきげん、くらべて先どり",
   jma: "気象庁",
+  amedas: "アメダス",
   openMeteo: "Open-Meteo",
   tide736: "tide736.net",
   gsi: "国土地理院",

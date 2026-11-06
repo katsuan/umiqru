@@ -4,12 +4,13 @@ import { DAYS, TZ, WAVE_MODELS, WIND_MODELS } from "./sources.js";
 import { state } from "./state.js";
 import { getJSON } from "./net.js";
 import { km } from "./place.js";
-import { jmaPops, jmaText } from "./jma.js";
+import { jmaPops, jmaText, loadAmedas } from "./jma.js";
 
 // 届いたものから順に state.data に入れて描き直す
 export async function loadForecasts(place, ctxP, onPart) {
   const q = `latitude=${place.lat}&longitude=${place.lon}&timezone=${encodeURIComponent(TZ)}&forecast_days=${DAYS}`;
-  const windUrl = models => `https://api.open-meteo.com/v1/forecast?${q}&hourly=wind_speed_10m,wind_direction_10m,precipitation&wind_speed_unit=ms&models=${models.join(",")}`;
+  // 突風（wind_gusts_10m）は GFS・IFS だけが出す（気象庁の MSM・GSM は空）
+  const windUrl = (models, gust = false) => `https://api.open-meteo.com/v1/forecast?${q}&hourly=wind_speed_10m,wind_direction_10m,precipitation${gust ? ",wind_gusts_10m" : ""}&wind_speed_unit=ms&models=${models.join(",")}`;
   // done … 届いた（読めなかったものも）出どころ。まだ届いていないグラフは「読みこみ中」と出すため
   const out = { errors: [], done: [], text: {}, pops: [], wind: { hourly: {} } };
   const finish = key => { out.done.push(key); onPart(out); };
@@ -17,10 +18,10 @@ export async function loadForecasts(place, ctxP, onPart) {
   const jobs = [
     // 1つだけのときは名前に予報の名前が付かないので付けなおす
     part("msm", getJSON(windUrl(["jma_msm"])), v => Object.entries(v.hourly).forEach(([k, a]) => { out.wind.hourly[k === "time" ? k : `${k}_jma_msm`] = a; })),
-    part("wind", getJSON(windUrl(WIND_MODELS.filter(m => m !== "jma_msm"))), v => Object.assign(out.wind.hourly, v.hourly)),
+    part("wind", getJSON(windUrl(WIND_MODELS.filter(m => m !== "jma_msm"), true)), v => Object.assign(out.wind.hourly, v.hourly)),
     part("waves", getJSON(`https://marine-api.open-meteo.com/v1/marine?${q}&cell_selection=sea&hourly=wave_height,wave_period,wave_direction,swell_wave_height&models=${WAVE_MODELS.join(",")}`),
       v => { out.waves = v; }, true).then(() => out.waves && fillOffshore(place, out)).then(() => { if (!out.done.includes("waves")) finish("waves"); }),
-    part("sea", getJSON(`https://marine-api.open-meteo.com/v1/marine?${q}&cell_selection=sea&hourly=sea_surface_temperature,sea_level_height_msl`), v => { out.sea = v; }),
+    part("sea", getJSON(`https://marine-api.open-meteo.com/v1/marine?${q}&cell_selection=sea&hourly=sea_surface_temperature,sea_level_height_msl,ocean_current_velocity,ocean_current_direction`), v => { out.sea = v; }),
     part("wx", getJSON(`https://api.open-meteo.com/v1/forecast?${q}&hourly=weather_code,temperature_2m,precipitation_probability,precipitation&daily=sunrise,sunset`), v => { out.wx = v; }),
   ];
   const ctx = await ctxP;
@@ -28,6 +29,8 @@ export async function loadForecasts(place, ctxP, onPart) {
     jobs.push(part("jma", getJSON(`https://www.jma.go.jp/bosai/forecast/data/forecast/${ctx.jma.office}.json`), v => {
       out.jma = v; out.text = jmaText(v, ctx.jma.c10); out.pops = jmaPops(v, ctx.jma.c10);
     }));
+    // いちばん近いアメダス（風を測っている所）の、いまの観測
+    jobs.push(part("amedas", loadAmedas(place), v => { out.amedas = v; }));
     jobs.push(part("warn", getJSON(`https://www.jma.go.jp/bosai/warning/data/warning/${ctx.jma.office}.json`), v => { out.warn = v; }));
   }
   await Promise.all(jobs);

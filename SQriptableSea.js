@@ -8,7 +8,7 @@
 // 新しい版が出ると通知で知らせます。入れかえ方は https://katsuan.github.io/umiqru/#howto
 // ======================================
 
-const SEA_BUILD = "ef66c751ac";
+const SEA_BUILD = "ad5badcfd5";
 
 const PALETTE = {
   brand: "#6C47FF",
@@ -1063,15 +1063,15 @@ async function loadSea(arg, ctx, item) {
   const lo = place.lon.toFixed(2);
   const q = `&timezone=Asia%2FTokyo&forecast_days=3`;
   const at = `latitude=${la}&longitude=${lo}`;
-  const windUrl = (models) => `https://api.open-meteo.com/v1/forecast?${at}${q}&hourly=wind_speed_10m,wind_direction_10m&wind_speed_unit=ms&models=${models.join(",")}`;
+  const windUrl = (models, gust = false) => `https://api.open-meteo.com/v1/forecast?${at}${q}&hourly=wind_speed_10m,wind_direction_10m${gust ? ",wind_gusts_10m" : ""}&wind_speed_unit=ms&models=${models.join(",")}`;
   const soft = (p) => p.catch(() => null);
   const today = ymd(ctx.now);
   const [areaJma, waves, sea, msm, wind, tide, wx] = await Promise.all([
     soft(seaArea(place, port)),
     soft(getJSON(`https://marine-api.open-meteo.com/v1/marine?${at}${q}&cell_selection=sea&hourly=wave_height,wave_direction&models=${SEA.waves.map((m) => m.key).join(",")}`, `sea_wave_${la}_${lo}.json`, 60, item)),
-    soft(getJSON(`https://marine-api.open-meteo.com/v1/marine?${at}${q}&cell_selection=sea&hourly=sea_surface_temperature`, `sea_sst_${la}_${lo}.json`, 120, item)),
+    soft(getJSON(`https://marine-api.open-meteo.com/v1/marine?${at}${q}&cell_selection=sea&hourly=sea_surface_temperature,ocean_current_velocity,ocean_current_direction`, `sea_sst2_${la}_${lo}.json`, 120, item)),
     soft(getJSON(windUrl(["jma_msm"]), `sea_msm_${la}_${lo}.json`, 60, item)),
-    soft(getJSON(windUrl(SEA.winds.slice(1).map((m) => m.key)), `sea_wind_${la}_${lo}.json`, 60, item)),
+    soft(getJSON(windUrl(SEA.winds.slice(1).map((m) => m.key), true), `sea_wind2_${la}_${lo}.json`, 60, item)),
     port ? soft(getJSON(`https://tide736.net/api/get_tide.php?pc=${port.pc}&hc=${port.hc}&yr=${ctx.now.getFullYear()}&mn=${ctx.now.getMonth() + 1}&dy=${ctx.now.getDate()}&rg=week`, `sea_tide_${port.pc}_${port.hc}_${today}.json`, 60 * 12, item)) : null,
     soft(getJSON(`https://api.open-meteo.com/v1/forecast?${at}${q}&hourly=weather_code,is_day,temperature_2m,precipitation_probability`, `sea_wx_${la}_${lo}.json`, 60, item)),
   ]);
@@ -1114,6 +1114,14 @@ async function loadSea(arg, ctx, item) {
     winds: SEA.winds.map((m) => ({ ...m, v: seaRound(windH[`wind_speed_10m_${m.key}`]), dir: (windH[`wind_direction_10m_${m.key}`] || []).slice(0, 48).map((v) => (v == null ? null : Math.round(v))) })),
     windDir: seaRound(firstOf(windH, "wind_direction_10m", SEA.winds)),
     sst: seaRound(sea && sea.hourly && sea.hourly.sea_surface_temperature),
+    gust: Array.from({ length: 48 }, (_, t) => {
+      const g = SEA.winds.map((m) => (windH[`wind_gusts_10m_${m.key}`] || [])[t]).filter((v) => v != null);
+      return g.length ? Math.round(Math.max(...g)) : null;
+    }),
+    current: {
+      kn: seaRound(((sea && sea.hourly && sea.hourly.ocean_current_velocity) || []).map((v) => (v == null ? null : v / 1.852))),
+      dir: ((sea && sea.hourly && sea.hourly.ocean_current_direction) || []).slice(0, 48),
+    },
     tide: days.length ? days.flatMap((c, i) => c.tide.slice(0, 72).map((p, j) => ({ m: i * 1440 + j * 20, cm: Math.round(p.cm) }))) : [],
     tideMarks: days.flatMap((c, i) => [
       ...c.flood.map((p) => ({ m: i * 1440 + mins(p.time), cm: Math.round(p.cm), k: "満潮", time: p.time })),
@@ -1552,7 +1560,9 @@ defineCard("sea", {
     }
     box.addSpacer();
     const foot = hrow(box, 8);
-    const parts = [next.tide && next.tide.text, next.mazume && (next.mazume.now ? `いま${next.mazume.k}` : next.mazume.text), (d.sst || [])[i] != null && w >= 280 ? `水温 ${Math.round(d.sst[i])}℃` : ""].filter(Boolean);
+    const gust = (d.gust || [])[i];
+    const cur = d.current && d.current.kn[i] != null ? `流れ ${d.current.dir[i] == null ? "" : `${seaDirText(d, d.current.dir[i])}へ`}${d.current.kn[i].toFixed(1)}kn` : "";
+    const parts = [next.tide && next.tide.text, next.mazume && (next.mazume.now ? `いま${next.mazume.k}` : next.mazume.text), gust != null ? `突風 ${gust}m/s` : "", cur, (d.sst || [])[i] != null && w >= 280 ? `水温 ${Math.round(d.sst[i])}℃` : ""].filter(Boolean);
     let left = w;
     parts.forEach((p) => {
       if (textWidth(p, 9) + 8 > left) return;
