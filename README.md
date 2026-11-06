@@ -6,5 +6,6 @@
 - 日本の出どころ：気象庁（天気・風・波の文、降水確率、警報・注意報）、tide736.net（潮汐表）
 - 緯度経度で読む予報：Open-Meteo（波4つ・風・水温・海面高度）
 - `ports.json`：tide736.net の港の一覧（位置つき）
+- `SQriptableSea.js`：iPhone の Scriptable に入れる海のウィジェット（q-sqriptable の `tools/build-sea.mjs` で SQriptable.js から作る。直接直さない）。入れ方はページの「iPhone のウィジェットにする」
 
 予報は計算のめやすです。航海には使えません。

@@ -127,6 +127,14 @@
 
   .status { font-size: 13px; color: var(--text-3); margin: 0 0 16px; min-height: 20px; }
   .tides { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 14px; color: var(--text-2); margin-top: 8px; }
+  details.howto summary { cursor: pointer; font-weight: 700; font-size: 16px; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  details.howto summary::-webkit-details-marker { display: none; }
+  details.howto summary .sub { font-weight: 400; font-size: 13px; }
+  details.howto[open] summary { margin-bottom: 8px; }
+  .steps { margin: 0; padding-left: 24px; display: grid; gap: 8px; font-size: 14px; }
+  .steps li::marker { color: var(--text-3); }
+  .copyrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+  code.param { font: 14px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--band); border-radius: 4px; padding: 2px 8px; word-break: break-all; }
   footer { font-size: 12px; color: var(--text-3); line-height: 1.8; }
   footer a { color: var(--text-2); }
   .waverows { display: grid; gap: 8px; }
@@ -183,6 +191,13 @@
   <section class="card" id="summary"></section>
 
   <section class="card">
+    <h2>天気と降水確率</h2>
+    <div id="wx-jma"></div>
+    <h3 class="small sub" style="margin:16px 0 0;font-weight:700">1時間ごと（横にスクロール）</h3>
+    <div id="wx-tl"></div>
+  </section>
+
+  <section class="card">
     <h2>波の高さ</h2>
     <div id="waves"></div>
     <ul class="legend" id="wave-legend"></ul>
@@ -214,6 +229,17 @@
     <div class="tides" id="tide-list"></div>
   </section>
 
+  <section class="card">
+    <details class="howto" id="howto">
+      <summary><span id="howto-title"></span><span class="sub">開く</span></summary>
+      <p class="sub small" style="margin:0 0 8px" id="howto-lead"></p>
+      <ol class="steps" id="howto-steps"></ol>
+      <h3 class="small sub" style="margin:16px 0 0;font-weight:700">Parameter の書き方</h3>
+      <div class="table-wrap"><table id="howto-params"></table></div>
+      <p class="muted small" style="margin:8px 0 0" id="howto-note"></p>
+    </details>
+  </section>
+
   <footer id="credits"></footer>
 </main>
 
@@ -225,6 +251,8 @@ const NAMES = {
   openMeteo: "Open-Meteo",
   tide736: "tide736.net",
   gsi: "国土地理院",
+  scriptable: "Scriptable",
+  widgetScript: "海の予報",
 };
 
 // 出どころ。日本のものを先に、緯度経度で読む世界の予報をあとに。色はグラフごとの並びで検証ずみ
@@ -388,6 +416,7 @@ async function loadForecasts(place, ctxP, onPart) {
     part("waves", getJSON(`https://marine-api.open-meteo.com/v1/marine?${q}&cell_selection=sea&hourly=wave_height,wave_period,wave_direction,swell_wave_height&models=${WAVE_MODELS.join(",")}`),
       v => { out.waves = v; }).then(() => out.waves && fillOffshore(place, out)).then(() => onPart(out)),
     part("sea", getJSON(`https://marine-api.open-meteo.com/v1/marine?${q}&cell_selection=sea&hourly=sea_surface_temperature,sea_level_height_msl`), v => { out.sea = v; }),
+    part("wx", getJSON(`https://api.open-meteo.com/v1/forecast?${q}&hourly=weather_code,temperature_2m,precipitation_probability,precipitation`), v => { out.wx = v; }),
   ];
   const ctx = await ctxP;
   if (ctx.jma) {
@@ -482,6 +511,26 @@ function jmaWarnings(json, c20) {
 const sliceDay = (arr, day) => arr ? arr.slice(day * 24, day * 24 + 25) : [];
 const hourlyPoints = (arr, day) => sliceDay(arr, day).map((y, x) => ({ x, y: y ?? null }));
 
+// ---- 外から来る文字（入力した場所の名前・港や市町村の名前・気象庁の文）は、HTML に入れる前に esc ----
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// Open-Meteo の天気の番号（WMO）を、短い言葉に
+function wxName(code) {
+  if (code == null) return "—";
+  if (code <= 1) return "晴れ";
+  if (code === 2) return "晴れ時々くもり";
+  if (code === 3) return "くもり";
+  if (code === 45 || code === 48) return "霧";
+  if (code >= 51 && code <= 57) return "霧雨";
+  if (code >= 61 && code <= 67) return "雨";
+  if (code >= 71 && code <= 77) return "雪";
+  if (code >= 80 && code <= 82) return "にわか雨";
+  if (code >= 85 && code <= 86) return "にわか雪";
+  if (code >= 95) return "雷雨";
+  return "—";
+}
+const wxShort = code => ({ "晴れ時々くもり": "晴/曇", "にわか雨": "にわか", "にわか雪": "雪", "くもり": "くもり" }[wxName(code)] || wxName(code));
+
 // ---- 数の見た目 ----
 const fmt = (v, d = 1) => v == null || Number.isNaN(v) ? "—" : v.toFixed(d);
 const DIRS = ["北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東", "南", "南南西", "南西", "西南西", "西", "西北西", "北西", "北北西"];
@@ -561,7 +610,8 @@ function drawChart(el, { series, bands = [], marks = [], yFloor = null, unit = "
     if (near?.y != null) g += `<circle cx="${hx}" cy="${Y(near.y).toFixed(1)}" r="4" fill="var(${s.color})" stroke="var(--surface)" stroke-width="2"/>`;
   });
 
-  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="${series.map(s => s.label).join("・")}（単位 ${unit}）。触った時刻の値は下の表">${g}</svg>`;
+  // qcheck-ok: W1 グラフの絵は数と決まった名前だけ（満潮・干潮の時刻と名前は esc 済み）
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="${esc(series.map(s => s.label).join("・"))}（単位 ${esc(unit)}）。触った時刻の値は下の表">${g}</svg>`;
   const svg = el.querySelector("svg");
   const pick = ev => {
     const r = svg.getBoundingClientRect();
@@ -670,7 +720,7 @@ function render() {
   // 警報・注意報（いま出ているもの）
   const warns = d.warn && ctx.jma ? jmaWarnings(d.warn, ctx.jma.c20) : [];
   document.getElementById("alert").innerHTML = warns.length
-    ? `<div class="alert" role="alert"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2l6.5 11.5h-13z"/><path d="M8 6.5v3M8 11.5v.01"/></svg><div><strong>いま ${ctx.jma.muniName}：${warns.join("・")}</strong><br><span class="sub small">${NAMES.jma}の発表</span></div></div>`
+    ? `<div class="alert" role="alert"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2l6.5 11.5h-13z"/><path d="M8 6.5v3M8 11.5v.01"/></svg><div><strong>いま ${esc(ctx.jma.muniName)}：${warns.join("・")}</strong><br><span class="sub small">${NAMES.jma}の発表</span></div></div>`
     : "";
 
   // 波（気象庁の文。3日先まで）
@@ -683,10 +733,10 @@ function render() {
         <div class="wr-day">${x.label.text}</div>
         <div class="wr-bar"><span style="width:${(top / maxM * 100).toFixed(0)}%"></span></div>
         <div class="wr-num">${x.t.nums.length ? fmt(top) : "—"}<span class="unit">m</span></div>
-        <div class="wr-text">${x.t.wave}</div>
+        <div class="wr-text">${esc(x.t.wave)}</div>
       </div>`;
     }).join("")}</div>
-    <p class="muted small" style="margin:8px 0 16px">${NAMES.jma}の${ctx.jma.name}の予報（いちばん高い値を棒に）。${state.day > 2 ? "この日のぶんはまだ出ていません。" : ""}</p>`
+    <p class="muted small" style="margin:8px 0 16px">${NAMES.jma}の${esc(ctx.jma.name)}の予報（いちばん高い値を棒に）。${state.day > 2 ? "この日のぶんはまだ出ていません。" : ""}</p>`
     : `<p class="muted small" style="margin:0 0 16px">${ctx.jma ? `${NAMES.jma}の波の予報を読めませんでした。` : `${NAMES.jma}の予報は日本だけです。`}</p>`;
   const waves = waveSeries(d);
   const off = d.offshore || {};
@@ -710,7 +760,7 @@ function render() {
       <th><span class="key"><i style="background:var(${s.color})"></i>${s.label}</span></th>
       <td class="num">${fmt(valueAt(s, h))}</td>
       <td>${arrow(s.dir[h])} ${windDirText(s.dir[h])}</td></tr>`).join("")}
-      <tr><th>文の予報</th><td colspan="2" class="wrap">${text?.wind || `<span class="muted">${state.day <= 2 ? "なし" : "3日先まで"}</span>`}</td></tr>
+      <tr><th>文の予報</th><td colspan="2" class="wrap">${text?.wind ? esc(text.wind) : `<span class="muted">${state.day <= 2 ? "なし" : "3日先まで"}</span>`}</td></tr>
     </tbody>`;
   timeline("wind-tl", wind, 1, windDirText);
   document.querySelectorAll("[data-dir]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.dir === state.windDir)));
@@ -730,17 +780,46 @@ function render() {
   }
   const bands = mz ? [{ from: 0, to: mz.rise }, { from: mz.set, to: 24 }] : [];
   const marks = tide ? [
-    ...tide.flood.map(t => ({ x: hm(t.time), y: t.cm - tideMean, label: t.time, up: true })),
-    ...tide.edd.map(t => ({ x: hm(t.time), y: t.cm - tideMean, label: t.time, up: false })),
+    ...tide.flood.map(t => ({ x: hm(t.time), y: t.cm - tideMean, label: esc(t.time), up: true })),
+    ...tide.edd.map(t => ({ x: hm(t.time), y: t.cm - tideMean, label: esc(t.time), up: false })),
   ] : [];
   legend(document.getElementById("tide-legend"), [
-    ...tideS.map(s => ({ label: s.key === "tide736" ? `${s.label}（${ctx.port.name}）` : s.label, color: s.color })),
+    ...tideS.map(s => ({ label: s.key === "tide736" ? `${s.label}（${esc(ctx.port.name)}）` : s.label, color: s.color })),
     ...(bands.length ? [{ label: "日の入り〜日の出", kind: "band" }] : []),
   ]);
   drawChart(document.getElementById("tide-chart"), { series: tideS, bands, marks, unit: "cm（平均からの差）", endLabels: false });
   document.getElementById("tide-list").innerHTML = tide
-    ? `<span>満潮 ${tide.flood.map(t => `${t.time}（${Math.round(t.cm)}cm）`).join("・") || "—"}</span><span>干潮 ${tide.edd.map(t => `${t.time}（${Math.round(t.cm)}cm）`).join("・") || "—"}</span><span>${tide.moon.title}（月齢 ${tide.moon.age}）</span>`
+    ? `<span>満潮 ${tide.flood.map(t => `${t.time}（${Math.round(t.cm)}cm）`).join("・") || "—"}</span><span>干潮 ${tide.edd.map(t => `${t.time}（${Math.round(t.cm)}cm）`).join("・") || "—"}</span><span>${esc(tide.moon.title)}（月齢 ${esc(tide.moon.age)}）</span>`
     : `<span class="muted">${ctx.port ? "潮汐表を読めませんでした" : `潮汐表は日本の港（${PORT_MAX_KM}km 以内）だけです`}</span>`;
+
+  // 天気：気象庁の文と6時間ごとの降水確率（3日先まで）、1時間ごとの表
+  const jmaDays = [0, 1, 2].map(i => ({ i, label: dayLabel(i), t: d.text[dayLabel(i).ymd] })).filter(x => x.t?.weather);
+  document.getElementById("wx-jma").innerHTML = jmaDays.length ? `<div class="table-wrap"><table>
+    <thead><tr><th>${NAMES.jma}</th><th>天気</th><th>降水確率（6時間ごと）</th></tr></thead>
+    <tbody>${jmaDays.map(x => {
+      const pops = d.pops.filter(p => p.ymd === x.label.ymd).map(p => `${p.from}〜${p.from + 6}時 ${esc(p.pop)}%`);
+      return `<tr${x.i === state.day ? ' class="on"' : ""}><th>${x.label.text}</th><td class="wrap">${esc(x.t.weather)}</td><td class="wrap">${pops.join("・") || "—"}</td></tr>`;
+    }).join("")}</tbody></table></div>`
+    : `<p class="muted small" style="margin:0">${ctx.jma ? `${NAMES.jma}の天気を読めませんでした。` : `${NAMES.jma}の天気は日本だけです。`}</p>`;
+  const wh = d.wx?.hourly;
+  if (wh) {
+    const at = (k, t) => sliceDay(wh[k], state.day)[t];
+    const row = (name, cell) => `<tr><th class="stick">${name}</th>${Array.from({ length: 24 }, (_, t) => `<td data-h="${t}" class="${t === h ? "on" : ""}">${cell(t)}</td>`).join("")}</tr>`;
+    const el = document.getElementById("wx-tl");
+    const keep = el.firstElementChild ? el.firstElementChild.scrollLeft : 0;
+    el.innerHTML = `<div class="timeline-in" style="overflow-x:auto"><table class="tl">
+      <thead><tr><th class="stick">時刻</th>${Array.from({ length: 24 }, (_, t) => `<th class="${t === h ? "on" : ""}">${t}時</th>`).join("")}</tr></thead>
+      <tbody>
+        ${row("天気", t => esc(wxShort(at("weather_code", t))))}
+        ${row("気温 ℃", t => fmt(at("temperature_2m", t), 0))}
+        ${row("降水確率 %", t => at("precipitation_probability", t) ?? "—")}
+        ${row("雨 mm", t => { const v = at("precipitation", t); return v == null ? "—" : v ? fmt(v) : "0"; })}
+      </tbody></table></div>`;
+    const box = el.firstElementChild;
+    const key = `${state.place?.name}:${state.day}`;
+    if (tlScroll["wx-tl"] !== key) { tlScroll["wx-tl"] = key; box.scrollLeft = Math.max(0, h - 1) * 40; } else box.scrollLeft = keep;
+    box.onclick = ev => { const td = ev.target.closest("td[data-h]"); if (td) setHour(Number(td.dataset.h)); };
+  } else document.getElementById("wx-tl").innerHTML = `<p class="muted small">読みこみ中…</p>`;
 
   // まとめ
   const pop = d.pops.find(p => p.ymd === day.ymd && h >= p.from && h < p.from + 6);
@@ -752,16 +831,16 @@ function render() {
   const wr = range(waveSeries(d).map(s => valueAt(s, h)));
   const sst = sliceDay(d.sea?.hourly?.sea_surface_temperature, state.day)[h];
   document.getElementById("summary").innerHTML = `
-    <div class="summary-head"><strong>${state.place.name}${state.place.coords && ctx.jma ? `（${ctx.jma.muniName}）` : ""}</strong><span class="sub">${day.short} ${h}時${ctx.jma ? "" : "（日本時間）"}</span></div>
-    <p class="where">潮：${ctx.port ? `${ctx.port.name}の港（${ctx.port.km.toFixed(0)}km）` : "—"}　${NAMES.jma}：${ctx.jma ? ctx.jma.name : "—"}</p>
+    <div class="summary-head"><strong>${esc(state.place.name)}${state.place.coords && ctx.jma ? `（${esc(ctx.jma.muniName)}）` : ""}</strong><span class="sub">${day.short} ${h}時${ctx.jma ? "" : "（日本時間）"}</span></div>
+    <p class="where">潮：${ctx.port ? `${esc(ctx.port.name)}の港（${ctx.port.km.toFixed(0)}km）` : "—"}　${NAMES.jma}：${ctx.jma ? esc(ctx.jma.name) : "—"}</p>
     <dl class="facts">
-      <div><dt>波（${NAMES.jma}）</dt><dd>${waveTop == null ? "—" : fmt(waveTop)}<span class="unit">${waveTop == null ? "" : "m まで"}</span><span class="note">${text?.wave || (!ctx.jma ? "日本だけ" : state.day > 2 ? "3日先まで" : "")}</span></dd></div>
+      <div><dt>波（${NAMES.jma}）</dt><dd>${waveTop == null ? "—" : fmt(waveTop)}<span class="unit">${waveTop == null ? "" : "m まで"}</span><span class="note">${text?.wave ? esc(text.wave) : (!ctx.jma ? "日本だけ" : state.day > 2 ? "3日先まで" : "")}</span></dd></div>
       <div><dt>波（4つの予報）</dt><dd>${wr ? (wr.n > 1 && wr.hi - wr.lo >= 0.05 ? `${fmt(wr.lo)}〜${fmt(wr.hi)}` : fmt(wr.hi)) : "—"}<span class="unit">m</span><span class="note">${wr && wr.n > 1 ? `いちばん大きい差 ${fmt(wr.hi - wr.lo)} m` : ""}</span></dd></div>
       <div><dt>風（${wind.filter(s => valueAt(s, h) != null).length}つの予報）</dt><dd>${r ? (r.n > 1 && r.hi - r.lo >= 0.05 ? `${fmt(r.lo)}〜${fmt(r.hi)}` : fmt(r.hi)) : "—"}<span class="unit">m/s</span><span class="note">${windDir != null ? (state.windDir === "deg" ? `向き ${windDirText(windDir)}` : `${dirName(windDir)}の風`) : ""}</span></dd></div>
-      <div><dt>潮</dt><dd>${tide ? tide.moon.title : "—"}<span class="note">${!tide ? "日本の港だけ" : nextTide ? `つぎ ${nextTide.k} ${nextTide.time}` : "この日はもうなし"}</span></dd></div>
+      <div><dt>潮</dt><dd>${tide ? esc(tide.moon.title) : "—"}<span class="note">${!tide ? "日本の港だけ" : nextTide ? `つぎ ${nextTide.k} ${nextTide.time}` : "この日はもうなし"}</span></dd></div>
       <div><dt>朝まづめ（めやす）</dt><dd>${mz ? `${hmText(mz.morning[0])}〜${hmText(mz.morning[1])}` : "—"}<span class="note">${mz ? `夕まづめ ${hmText(mz.evening[0])}〜${hmText(mz.evening[1])}` : "日本の港だけ"}</span></dd></div>
       <div><dt>水温</dt><dd>${fmt(sst)}<span class="unit">℃</span><span class="note">${NAMES.openMeteo}</span></dd></div>
-      <div><dt>天気（${NAMES.jma}）</dt><dd class="text">${text?.weather || "—"}<span class="note">${pop ? `降水確率 ${pop.pop}%（${pop.from}〜${pop.from + 6}時）` : ""}</span></dd></div>
+      <div><dt>天気（${h}時）</dt><dd class="text">${wh ? esc(wxName(sliceDay(wh.weather_code, state.day)[h])) : "—"}<span class="note">${wh && sliceDay(wh.precipitation_probability, state.day)[h] != null ? `降水確率 ${sliceDay(wh.precipitation_probability, state.day)[h]}%` : ""}${pop ? `・${NAMES.jma} ${esc(pop.pop)}%（${pop.from}〜${pop.from + 6}時）` : ""}</span></dd></div>
     </dl>`;
 }
 
@@ -783,9 +862,10 @@ async function go(place) {
     state.ctx = await ctxP; await tideP;
     state.place = place; state.data = data;
     remember(place);
+    drawHowto();
     await refreshTide();
     // MSM は日本のまわりだけなので、日本の外では読めなくてよい
-    const names = { wind: "風", msm: state.ctx.jma ? "風（MSM）" : null, waves: "波", sea: "水温・海面", jma: `${NAMES.jma}の予報`, warn: `${NAMES.jma}の警報` };
+    const names = { wx: "天気", wind: "風", msm: state.ctx.jma ? "風（MSM）" : null, waves: "波", sea: "水温・海面", jma: `${NAMES.jma}の予報`, warn: `${NAMES.jma}の警報` };
     const errs = data.errors.map(k => names[k]).filter(Boolean);
     statusEl().textContent = errs.length ? `読めなかったもの：${errs.join("・")}` : "";
   } catch (e) {
@@ -805,8 +885,63 @@ function remember(place) {
 function drawRecent() {
   const list = store.get("marine-compare:recent") || [];
   const el = document.getElementById("recent");
-  el.innerHTML = list.map((p, i) => `<button type="button" class="recent" data-i="${i}" aria-pressed="${state.place?.name === p.name}">${p.name}</button>`).join("");
+  el.innerHTML = list.map((p, i) => `<button type="button" class="recent" data-i="${i}" aria-pressed="${state.place?.name === p.name}">${esc(p.name)}</button>`).join("");
   el.onclick = ev => { const b = ev.target.closest("button"); if (b) go(list[Number(b.dataset.i)]); };
+}
+
+// ---- iPhone のウィジェットにする ----
+const SCRIPT_FILE = "SQriptableSea.js";
+let scriptText = null;
+const loadScript = () => scriptText ? Promise.resolve(scriptText) : fetch(SCRIPT_FILE).then(r => { if (!r.ok) throw new Error(r.status); return r.text(); }).then(t => (scriptText = t));
+// いま見ている場所の Parameter（座標は4けたまで）
+function placeParam() {
+  const p = state.place;
+  if (!p) return "城ヶ島";
+  return p.coords || p.name === "今いる場所" ? `${p.lat.toFixed(4)},${p.lon.toFixed(4)}` : p.name;
+}
+async function copyText(get, btn) {
+  const label = btn.textContent;
+  try {
+    // iPhone の Safari は、押したあとに読みこむと写せないので、読みこみごと渡す
+    if (window.ClipboardItem && navigator.clipboard?.write) {
+      await navigator.clipboard.write([new ClipboardItem({ "text/plain": Promise.resolve(get()).then(t => new Blob([t], { type: "text/plain" })) })]);
+    } else {
+      await navigator.clipboard.writeText(await get());
+    }
+    btn.textContent = "コピーしました";
+  } catch {
+    btn.textContent = "コピーできませんでした";
+  }
+  setTimeout(() => { btn.textContent = label; }, 2000);
+}
+function drawHowto() {
+  const S = NAMES.scriptable, W = NAMES.widgetScript;
+  document.getElementById("howto-title").textContent = "iPhone のウィジェットにする";
+  document.getElementById("howto-lead").textContent = `${S}（無料のアプリ）に、このページと同じ海の予報を出すスクリプトを入れて、ホーム画面に置きます。`;
+  const param = placeParam();
+  document.getElementById("howto-steps").innerHTML = `
+    <li>App Store で「${S}」を入れる（無料）。</li>
+    <li>下のボタンでスクリプトをコピーする。
+      <div class="copyrow"><button type="button" class="primary" id="copy-script">スクリプトをコピー</button><a href="${SCRIPT_FILE}" class="small sub" rel="noopener">ファイルを開く</a></div></li>
+    <li>${S} を開き、右上の「＋」を押す。白い画面を長押しして「ペースト」。</li>
+    <li>上の名前（Untitled Script）を押して「${W}」に変え、左上の「Done」で閉じる。</li>
+    <li>一覧の「${W}」を押すと、場所と出すものを選んで、その場で見られる（今いる場所を使うときは、位置情報を許可する）。</li>
+    <li>ホーム画面のあいている所を長押し → 左上の「編集」→「ウィジェットを追加」→「${S}」→ 大きさを選ぶ（大がいちばん多く出る）→「ウィジェットを追加」。</li>
+    <li>置いたウィジェットを長押し →「ウィジェットを編集」→ Script で「${W}」を選び、Parameter に場所を書く。いま見ている場所なら：
+      <div class="copyrow"><code class="param" id="howto-param">${esc(param)}</code><button type="button" id="copy-param">コピー</button></div></li>
+    <li>ホーム画面にもどると表示される。ウィジェットを押すと、このページがその場所で開く。</li>`;
+  document.getElementById("howto-params").innerHTML = `
+    <thead><tr><th>書き方</th><th>出るもの</th></tr></thead>
+    <tbody>
+      <tr><td><code class="param">城ヶ島</code></td><td class="wrap">港の名前・地名で</td></tr>
+      <tr><td><code class="param">32.7987,132.4959</code></td><td class="wrap">緯度・経度で（日本の外も）</td></tr>
+      <tr><td><span class="muted">（空）</span></td><td class="wrap">今いる場所</td></tr>
+      <tr><td><code class="param">城ヶ島,wave,wind</code></td><td class="wrap">書いたものだけを書いた順に（wave 波・tide 潮・wind 風）</td></tr>
+      <tr><td><code class="param">城ヶ島,wind,deg</code></td><td class="wrap">風の表だけ・向きを角度で</td></tr>
+    </tbody>`;
+  document.getElementById("howto-note").textContent = `ウィジェットは iOS の都合で15分〜1時間ごとに描き直されます。Parameter の「,」や「:」が消えてしまうときは、${S} の中で「${W}」を一度開いて、出てくるメニューで作った Parameter を貼ってください。`;
+  document.getElementById("copy-script").onclick = ev => copyText(loadScript, ev.currentTarget);
+  document.getElementById("copy-param").onclick = ev => copyText(() => document.getElementById("howto-param").textContent, ev.currentTarget);
 }
 
 function init() {
@@ -855,6 +990,12 @@ function init() {
   let t;
   window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(render, 150); });
   drawRecent();
+  drawHowto();
+  document.getElementById("howto").addEventListener("toggle", ev => {
+    const open = ev.currentTarget.open;
+    ev.currentTarget.querySelector("summary .sub").textContent = open ? "閉じる" : "開く";
+    if (open) loadScript().catch(() => {});
+  });
   // ?q=32.7987,132.4959 や ?q=城ヶ島 のリンクで、その場所を開く
   const q = new URLSearchParams(location.search).get("q");
   const last = (store.get("marine-compare:recent") || [])[0];
