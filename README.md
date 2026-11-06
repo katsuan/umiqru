@@ -2,7 +2,7 @@
 
 同じ場所の海の予報を、出どころごとに並べてくらべるツール。釣りや海あそびの前の下しらべ用。名前は「うみくる」（海のようすが先に来る）。英字は UmiQru（「く」を Q にする。そらくる＝SoraQru と同じ作り方）。キャッチコピーは「海のごきげん、くらべて先どり」。GitHub Pages でそのまま動く静的サイトで、サーバーは使わない。
 
-公開URL: https://katsuan.github.io/umiqru/ （ためし中。検索には出さない（noindex）。くらぶ〜Qlove〜の一覧・ポートフォリオにはまだ載せていない）
+公開URL: https://katsuan.github.io/umiqru/ （2026-11-06 公開。くらぶ〜Qlove〜の一覧（👾 きたく部、そらくるの次）に載せた。ポートフォリオにはまだ）
 
 ## できること
 
@@ -45,7 +45,7 @@
 
 - いまは main をそのまま GitHub Pages に出している（ためしの間）
 - Q 共通の公開（katsuan/oqrn の `q-pages.yml`。テストは非公開の q-dev）に切りかえるときは、このリポジトリの secret に `Q_DEV_KEY` を登録してから `.github/workflows/pages.yml` を足す
-- なかまの一覧（hub-links.json）・ポートフォリオに載せるときは、`index.html` の noindex を外す
+- ページの下の「なかまのツール」の行は Q キットの `tool-share.js`（中身は q-oqrn の `data/hub-links.json` の umiqru）
 
 ## 出どころと使い方
 

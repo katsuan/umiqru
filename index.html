@@ -3,8 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<!-- ためしの間は検索に出さない。なかまの一覧・ポートフォリオに載せるときに外す -->
-<meta name="robots" content="noindex, nofollow">
 <title>うみくる｜海のごきげん、くらべて先どり</title>
 <meta name="description" content="うみくる（UmiQru）。同じ場所の波・風・潮・天気を、気象庁と世界の予報でくらべる。釣りや海あそびの前の下しらべに。無料・登録なし。">
 <meta property="og:type" content="website">
@@ -109,8 +107,12 @@
   </section>
 
   <footer id="credits"></footer>
+  <div data-tool-share></div>
 </main>
 
+<script src="https://katsuan.github.io/oqrn/shared/oqrn.js"></script>
+<script src="https://katsuan.github.io/oqrn/shared/ui.js" defer></script>
 <script type="module" src="app.js"></script>
+<script src="https://katsuan.github.io/oqrn/shared/tool-share.js" data-tool="umiqru" defer></script>
 </body>
 </html>
