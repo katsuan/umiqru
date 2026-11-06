@@ -85,8 +85,8 @@ function render() {
         <div class="wr-text">${esc(x.t.wave)}</div>
       </div>`;
     }).join("")}</div>
-    <p class="muted small" style="margin:8px 0 16px">${NAMES.jma}の${esc(ctx.jma.name)}の予報（いちばん高い値を棒に）。${state.day > 2 ? "この日のぶんはまだ出ていません。" : ""}</p>`
-    : `<p class="muted small" style="margin:0 0 16px">${ctx.jma ? `${NAMES.jma}の波の予報を読めませんでした。` : `${NAMES.jma}の予報は日本だけです。`}</p>`;
+    <p class="muted small" style="margin:8px 0 0">${NAMES.jma}の${esc(ctx.jma.name)}の予報（いちばん高い値を棒に）。${state.day > 2 ? "この日のぶんはまだ出ていません。" : ""}</p>`
+    : `<p class="muted small" style="margin:0">${ctx.jma ? `${NAMES.jma}の波の予報を読めませんでした。` : `${NAMES.jma}の予報は日本だけです。`}</p>`;
   const waves = waveSeries(d);
   const off = d.offshore || {};
   const nightKey = bands.length ? [{ label: "夜", kind: "band" }] : [];
@@ -197,8 +197,8 @@ function render() {
     <div class="summary-head"><strong>${esc(state.place.name)}${state.place.coords && ctx.jma ? `（${esc(ctx.jma.muniName)}）` : ""}</strong><span class="sub">${day.short} ${h}時${ctx.jma ? "" : "（日本時間）"}</span></div>
     <p class="where">潮：${ctx.port ? `${esc(ctx.port.name)}の港（${ctx.port.km.toFixed(0)}km）` : "—"}　${NAMES.jma}：${ctx.jma ? esc(ctx.jma.name) : "—"}</p>
     <dl class="facts">
-      <div><dt><span class="ls-icon is-text" data-icon="waves" aria-hidden="true"></span>波（${NAMES.jma}）</dt><dd>${waveTop == null ? "—" : fmt(waveTop)}<span class="unit">${waveTop == null ? "" : "m まで"}</span><span class="note">${text?.wave ? esc(text.wave) : (!ctx.jma ? "日本だけ" : state.day > 2 ? "3日先まで" : "")}</span></dd></div>
       <div><dt><span class="ls-icon is-text" data-icon="waves" aria-hidden="true"></span>波（4つの予報）</dt><dd>${wr ? (wr.n > 1 && wr.hi - wr.lo >= 0.05 ? `${fmt(wr.lo)}〜${fmt(wr.hi)}` : fmt(wr.hi)) : "—"}<span class="unit">m</span><span class="note">${wr && wr.n > 1 ? `いちばん大きい差 ${fmt(wr.hi - wr.lo)} m` : ""}</span></dd></div>
+      <div><dt><span class="ls-icon is-text" data-icon="waves" aria-hidden="true"></span>波（${NAMES.jma}）</dt><dd>${waveTop == null ? "—" : fmt(waveTop)}<span class="unit">${waveTop == null ? "" : "m まで"}</span><span class="note">${text?.wave ? esc(text.wave) : (!ctx.jma ? "日本だけ" : state.day > 2 ? "3日先まで" : "")}</span></dd></div>
       <div><dt><span class="ls-icon is-text" data-icon="wind" aria-hidden="true"></span>風（${wind.filter(s => valueAt(s, h) != null).length}つの予報）</dt><dd>${r ? (r.n > 1 && r.hi - r.lo >= 0.05 ? `${fmt(r.lo)}〜${fmt(r.hi)}` : fmt(r.hi)) : "—"}<span class="unit">m/s</span><span class="note">${windDir != null ? (state.windDir === "deg" ? `向き ${windDirText(windDir)}` : `${dirName(windDir)}の風`) : ""}</span></dd></div>
       <div><dt><span class="ls-icon is-text" data-icon="moon" aria-hidden="true"></span>潮</dt><dd>${tide ? esc(tide.moon.title) : "—"}<span class="note">${!tide ? "日本の港だけ" : nextTide ? `つぎ ${nextTide.when || ""}${nextTide.k} ${nextTide.time}` : "満潮・干潮の時刻を読めませんでした"}</span></dd></div>
       <div><dt><span class="ls-icon is-text" data-icon="sunrise" aria-hidden="true"></span>朝まづめ（めやす）</dt><dd>${mz ? `${hmText(mz.morning[0])}〜${hmText(mz.morning[1])}` : "—"}<span class="note">${mz ? `夕まづめ ${hmText(mz.evening[0])}〜${hmText(mz.evening[1])}` : "日本の港だけ"}</span></dd></div>

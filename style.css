@@ -136,7 +136,8 @@
   .waverow.on .wr-day { font-weight: 700; }
   .wr-day { grid-area: day; font-size: 14px; }
   .wr-bar { grid-area: bar; height: 8px; background: var(--grid); border-radius: 4px; overflow: hidden; }
-  .wr-bar span { display: block; height: 100%; background: var(--s-ecmwf); border-radius: 4px; }
+  /* 気象庁の棒は、グラフの気象庁の点線と同じ灰色（WAM の青とまちがえないように） */
+  .wr-bar span { display: block; height: 100%; background: var(--text-3); border-radius: 4px; }
   .wr-num { grid-area: num; text-align: right; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
   .wr-num .unit, .facts dd .unit { font-size: 13px; font-weight: 400; color: var(--text-2); margin-left: 2px; }
   .wr-text { grid-area: text; font-size: 13px; }
