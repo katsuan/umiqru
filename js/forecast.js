@@ -10,14 +10,16 @@ import { jmaPops, jmaText } from "./jma.js";
 export async function loadForecasts(place, ctxP, onPart) {
   const q = `latitude=${place.lat}&longitude=${place.lon}&timezone=${encodeURIComponent(TZ)}&forecast_days=${DAYS}`;
   const windUrl = models => `https://api.open-meteo.com/v1/forecast?${q}&hourly=wind_speed_10m,wind_direction_10m,precipitation&wind_speed_unit=ms&models=${models.join(",")}`;
-  const out = { errors: [], text: {}, pops: [], wind: { hourly: {} } };
-  const part = (key, p, use) => p.then(v => { use(v); onPart(out); }, () => { out.errors.push(key); onPart(out); });
+  // done … 届いた（読めなかったものも）出どころ。まだ届いていないグラフは「読みこみ中」と出すため
+  const out = { errors: [], done: [], text: {}, pops: [], wind: { hourly: {} } };
+  const finish = key => { out.done.push(key); onPart(out); };
+  const part = (key, p, use, later = false) => p.then(v => { use(v); if (later) onPart(out); else finish(key); }, () => { out.errors.push(key); finish(key); });
   const jobs = [
     // 1つだけのときは名前に予報の名前が付かないので付けなおす
     part("msm", getJSON(windUrl(["jma_msm"])), v => Object.entries(v.hourly).forEach(([k, a]) => { out.wind.hourly[k === "time" ? k : `${k}_jma_msm`] = a; })),
     part("wind", getJSON(windUrl(WIND_MODELS.filter(m => m !== "jma_msm"))), v => Object.assign(out.wind.hourly, v.hourly)),
     part("waves", getJSON(`https://marine-api.open-meteo.com/v1/marine?${q}&cell_selection=sea&hourly=wave_height,wave_period,wave_direction,swell_wave_height&models=${WAVE_MODELS.join(",")}`),
-      v => { out.waves = v; }).then(() => out.waves && fillOffshore(place, out)).then(() => onPart(out)),
+      v => { out.waves = v; }, true).then(() => out.waves && fillOffshore(place, out)).then(() => { if (!out.done.includes("waves")) finish("waves"); }),
     part("sea", getJSON(`https://marine-api.open-meteo.com/v1/marine?${q}&cell_selection=sea&hourly=sea_surface_temperature,sea_level_height_msl`), v => { out.sea = v; }),
     part("wx", getJSON(`https://api.open-meteo.com/v1/forecast?${q}&hourly=weather_code,temperature_2m,precipitation_probability,precipitation&daily=sunrise,sunset`), v => { out.wx = v; }),
   ];
@@ -66,10 +68,17 @@ export async function loadTide(port, ymd) {
   const key = `${port.pc}-${port.hc}:${ymd}`;
   if (state.tideCache[key]) return state.tideCache[key];
   const [y, m, d] = ymd.split("-").map(Number);
-  const j = await getJSON(`https://tide736.net/api/get_tide.php?pc=${port.pc}&hc=${port.hc}&yr=${y}&mn=${m}&dy=${d}&rg=day`);
-  const c = j?.tide?.chart?.[ymd];
-  if (!c) throw new Error("no tide");
-  state.tideCache[key] = c;
-  return c;
+  state.tideWait.add(key);
+  try {
+    const j = await getJSON(`https://tide736.net/api/get_tide.php?pc=${port.pc}&hc=${port.hc}&yr=${y}&mn=${m}&dy=${d}&rg=day`);
+    const c = j?.tide?.chart?.[ymd];
+    if (!c) throw new Error("no tide");
+    state.tideCache[key] = c;
+    return c;
+  } finally {
+    state.tideWait.delete(key);
+  }
 }
+// 潮汐表をまだ読んでいる最中か（その日）
+export const tideWaiting = ymd => !!state.ctx?.port && state.tideWait.has(`${state.ctx.port.pc}-${state.ctx.port.hc}:${ymd}`);
 export const tideFor = ymd => state.ctx?.port ? state.tideCache[`${state.ctx.port.pc}-${state.ctx.port.hc}:${ymd}`] : null;

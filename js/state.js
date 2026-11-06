@@ -3,8 +3,8 @@
 
 import { store } from "./store.js";
 
-// いま見ている場所・日・時刻。render … 描き直す関数（app.js が入れる）
-export const state = { place: null, ctx: null, data: null, day: 0, hour: 0, windDir: store.get("umiqru:winddir") === "deg" ? "deg" : "16", tideCache: {}, render: () => {} };
+// いま見ている場所・日・時刻。tideWait … 潮汐表を読んでいる最中の港と日。render … 描き直す関数（app.js が入れる）
+export const state = { place: null, ctx: null, data: null, day: 0, hour: 0, windDir: store.get("umiqru:winddir") === "deg" ? "deg" : "16", tideCache: {}, tideWait: new Set(), render: () => {} };
 
 // 見る時刻を変えて、描き直す
 export function setHour(h) {

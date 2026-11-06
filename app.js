@@ -6,7 +6,7 @@ import { store } from "./js/store.js";
 import { setHour, state } from "./js/state.js";
 import { dayLabel, hm, hmText, hourlyPoints, sliceDay, tokyoParts } from "./js/time.js";
 import { findPlace, km, placeContext } from "./js/place.js";
-import { loadForecasts, loadTide, tideFor } from "./js/forecast.js";
+import { loadForecasts, loadTide, tideFor, tideWaiting } from "./js/forecast.js";
 import { jmaWarnings } from "./js/jma.js";
 import { arrow, dirName, esc, fmt, rainCell, rainMmCell, range, tempCell, tideEvents, tideRange, valueAt, wxName, wxShort } from "./js/format.js";
 import { dashSwatch, drawChart, legend, timeline, tlScroll } from "./js/chart.js";
@@ -66,6 +66,9 @@ function render() {
   })();
   const bands = sunFrom ? [{ from: 0, to: sunFrom.rise }, { from: sunFrom.set, to: 24 }] : [];
   const text = d.text[day.ymd];
+  // まだ届いていない出どころ（グラフが空でも「この日のデータはありません」と出さない）
+  const waiting = (...keys) => keys.some(k => !d.done.includes(k));
+  const waveWait = waiting("waves"), windWait = waiting("msm", "wind"), tideWait = tideWaiting(day.ymd) || waiting("sea");
 
   // 警報・注意報（いま出ているもの）
   const warns = d.warn && ctx.jma ? jmaWarnings(d.warn, ctx.jma.c20) : [];
@@ -92,7 +95,7 @@ function render() {
   const off = d.offshore || {};
   const nightKey = bands.length ? [{ label: "夜", kind: "band" }] : [];
   legend(document.getElementById("wave-legend"), [...waves.map(s => ({ label: s.label, color: s.color, dash: s.dash })), ...nightKey]);
-  drawChart(document.getElementById("wave-chart"), { series: waves, bands, yFloor: 0, unit: "m" });
+  drawChart(document.getElementById("wave-chart"), { series: waves, bands, yFloor: 0, unit: "m", waiting: waveWait });
   document.getElementById("wave-table").innerHTML = `
     <thead><tr><th>${h}時</th><th class="num">波 m</th><th class="num">周期 秒</th><th class="num">うねり m</th><th>来る向き</th></tr></thead>
     <tbody>${waves.map(s => `<tr>
@@ -104,7 +107,7 @@ function render() {
   // 風（気象庁の2つの計算）
   const wind = windSeries(d);
   legend(document.getElementById("wind-legend"), [...wind.map(s => ({ label: s.label, color: s.color, dash: s.dash })), ...nightKey]);
-  drawChart(document.getElementById("wind-chart"), { series: wind, bands, yFloor: 0, unit: "m/s" });
+  drawChart(document.getElementById("wind-chart"), { series: wind, bands, yFloor: 0, unit: "m/s", waiting: windWait });
   document.getElementById("wind-table").innerHTML = `
     <thead><tr><th>${h}時</th><th class="num">風速 m/s</th><th>吹いてくる向き</th></tr></thead>
     <tbody>${wind.map(s => `<tr>
@@ -137,12 +140,12 @@ function render() {
     ...tideS.map(s => ({ label: s.key === "tide736" ? `${s.label}（${esc(ctx.port.name)}）` : s.label, color: s.color })),
     ...(bands.length ? [{ label: "日の入り〜日の出", kind: "band" }] : []),
   ]);
-  drawChart(document.getElementById("tide-chart"), { series: tideS, bands, marks, unit: "cm（平均からの差）", endLabels: false });
+  drawChart(document.getElementById("tide-chart"), { series: tideS, bands, marks, unit: "cm（平均からの差）", endLabels: false, waiting: tideWait });
   const tideDiff = tideRange(tide);
   const tideTimes = list => list.map(t => `${esc(t.time)}（${Math.round(t.cm)}cm）`).join("・") || "—";
   document.getElementById("tide-list").innerHTML = tide
     ? `<span>満潮 ${tideTimes(tide.flood)}</span><span>干潮 ${tideTimes(tide.edd)}</span><span>${esc(tide.moon.title)}（月齢 ${esc(tide.moon.age)}）</span>${tideDiff ? `<span>${tideDiff}</span>` : ""}`
-    : `<span class="muted">${ctx.port ? "潮汐表を読めませんでした" : `潮汐表は日本の港（${PORT_MAX_KM}km 以内）だけです`}</span>`;
+    : `<span class="muted">${ctx.port ? (tideWaiting(day.ymd) ? "読みこみ中…" : "潮汐表を読めませんでした") : `潮汐表は日本の港（${PORT_MAX_KM}km 以内）だけです`}</span>`;
 
   // 天気：気象庁の文と6時間ごとの降水確率（3日先まで）、1時間ごとの表
   const jmaDays = [0, 1, 2].map(i => ({ i, label: dayLabel(i), t: d.text[dayLabel(i).ymd] })).filter(x => x.t?.weather);
@@ -209,15 +212,15 @@ function render() {
       <a class="fact" href="#sec-wave"><span class="dt"><span class="ls-icon is-text" data-icon="waves" aria-hidden="true"></span>波（4つの予報）</span><span class="dd">${wr ? (wr.n > 1 && wr.hi - wr.lo >= 0.05 ? `${fmt(wr.lo)}〜${fmt(wr.hi)}` : fmt(wr.hi)) : "—"}<span class="unit">m</span><span class="note">${wr && wr.n > 1 ? `いちばん大きい差 ${fmt(wr.hi - wr.lo)} m` : ""}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
       <a class="fact" href="#waves"><span class="dt"><span class="ls-icon is-text" data-icon="waves" aria-hidden="true"></span>波（${NAMES.jma}）</span><span class="dd">${waveTop == null ? "—" : fmt(waveTop)}<span class="unit">${waveTop == null ? "" : "m まで"}</span><span class="note">${text?.wave ? esc(text.wave) : (!ctx.jma ? "日本だけ" : state.day > 2 ? "3日先まで" : "")}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
       <a class="fact" href="#sec-wind"><span class="dt"><span class="ls-icon is-text" data-icon="wind" aria-hidden="true"></span>風（${wind.filter(s => valueAt(s, h) != null).length}つの予報）</span><span class="dd">${r ? (r.n > 1 && r.hi - r.lo >= 0.05 ? `${fmt(r.lo)}〜${fmt(r.hi)}` : fmt(r.hi)) : "—"}<span class="unit">m/s</span><span class="note">${windDir != null ? (state.windDir === "deg" ? `向き ${windDirText(windDir)}` : `${dirName(windDir)}の風`) : ""}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
-      <a class="fact" href="#sec-tide"><span class="dt"><span class="ls-icon is-text" data-icon="moon" aria-hidden="true"></span>潮</span><span class="dd">${tide ? esc(tide.moon.title) : "—"}<span class="note">${!tide ? "日本の港だけ" : nextTide ? `${tideDiff ? `${tideDiff}<br>` : ""}つぎ ${nextTide.when || ""}${nextTide.k} ${esc(nextTide.time)}` : "満潮・干潮の時刻を読めませんでした"}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
+      <a class="fact" href="#sec-tide"><span class="dt"><span class="ls-icon is-text" data-icon="moon" aria-hidden="true"></span>潮</span><span class="dd">${tide ? esc(tide.moon.title) : "—"}<span class="note">${!tide ? (tideWaiting(day.ymd) ? "読みこみ中…" : ctx.port ? "読めませんでした" : "日本の港だけ") : nextTide ? `${tideDiff ? `${tideDiff}<br>` : ""}つぎ ${nextTide.when || ""}${nextTide.k} ${esc(nextTide.time)}` : "満潮・干潮の時刻を読めませんでした"}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
       <a class="fact" href="#sec-tide"><span class="dt"><span class="ls-icon is-text" data-icon="sunrise" aria-hidden="true"></span>朝まづめ（めやす）</span><span class="dd">${mz ? `${hmText(mz.morning[0])}〜${hmText(mz.morning[1])}` : "—"}<span class="note">${mz ? `夕まづめ ${hmText(mz.evening[0])}〜${hmText(mz.evening[1])}` : "日本の港だけ"}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
       <a class="fact" href="#sec-wave"><span class="dt"><span class="ls-icon is-text" data-icon="thermometer" aria-hidden="true"></span>水温</span><span class="dd">${fmt(sst)}<span class="unit">℃</span><span class="note">${NAMES.openMeteo}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
       <a class="fact" href="#sec-weather"><span class="dt"><span class="ls-icon is-text" data-icon="cloud-sun" aria-hidden="true"></span>天気（${h}時）</span><span class="dd text">${wh ? esc(wxName(sliceDay(wh.weather_code, state.day)[h])) : "—"}<span class="note">${wh && sliceDay(wh.precipitation_probability, state.day)[h] != null ? `降水確率 ${sliceDay(wh.precipitation_probability, state.day)[h]}%` : ""}${pop ? `・${NAMES.jma} ${esc(pop.pop)}%（${pop.from}〜${pop.from + 6}時）` : ""}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
     </div>`;
   // ウィジェットと同じ小さいグラフ（押すと詳しい欄へ）
-  drawChart(document.getElementById("mini-wave"), { series: waves, bands, yFloor: 0, unit: "m", mini: true });
+  drawChart(document.getElementById("mini-wave"), { series: waves, bands, yFloor: 0, unit: "m", mini: true, waiting: waveWait });
   if (tideS.length) drawChart(document.getElementById("mini-tide"), { series: tideS.slice(0, 1), bands, marks, unit: "cm", mini: true });
-  else document.getElementById("mini-tide").innerHTML = `<p class="muted small" style="margin:8px 0 0">潮汐表は日本の港だけ</p>`;
+  else document.getElementById("mini-tide").innerHTML = `<p class="muted small" style="margin:8px 0 0">${tideWait ? "読みこみ中…" : "潮汐表は日本の港だけ"}</p>`;
 }
 
 // ---- 流れ ----

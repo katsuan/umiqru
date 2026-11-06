@@ -13,14 +13,15 @@ export function niceScale(min, max, count = 4) {
   return { min: Math.floor(min / step) * step, max: Math.ceil(max / step) * step, step };
 }
 // mini … まとめの小さいグラフ（目盛りの字・線の名前なし。触っても時刻は変えない。押すと詳しい欄へ）
-export function drawChart(el, { series, bands = [], marks = [], yFloor = null, unit = "", endLabels = true, mini = false }) {
+// waiting … まだ届いていない（空なら「この日のデータはありません」でなく「読みこみ中」）
+export function drawChart(el, { series, bands = [], marks = [], yFloor = null, unit = "", endLabels = true, mini = false, waiting = false }) {
   const W = Math.max(mini ? 120 : 280, el.clientWidth || 320);
   const H = mini ? 80 : 200;
   // 小さいグラフに満潮・干潮の時刻を書くときは、上と下に字のぶんのあき
   const m = mini ? { l: 2, r: 2, t: marks.length ? 14 : 6, b: marks.length ? 26 : 14 } : { l: 40, r: endLabels ? 56 : 16, t: 16, b: 24 };
   const pw = W - m.l - m.r, ph = H - m.t - m.b;
   const ys = series.flatMap(s => s.points.map(p => p.y)).filter(v => v != null);
-  if (!ys.length) { el.innerHTML = `<p class="muted small">この日のデータはありません。</p>`; return; }
+  if (!ys.length) { el.innerHTML = `<p class="muted small">${waiting ? "読みこみ中…" : "この日のデータはありません。"}</p>`; return; }
   let lo = Math.min(...ys), hi = Math.max(...ys);
   if (yFloor != null) lo = Math.min(yFloor, lo);
   const sc = niceScale(lo, hi);
