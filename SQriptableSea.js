@@ -8,7 +8,7 @@
 // 新しい版が出ると通知で知らせます。入れかえ方は https://katsuan.github.io/umiqru/#howto
 // ======================================
 
-const SEA_BUILD = "79b0b9a0b6";
+const SEA_BUILD = "d2f0ed849f";
 
 const PALETTE = {
   brand: "#6C47FF",
@@ -871,19 +871,26 @@ const SEA = {
   page: "https://katsuan.github.io/umiqru/",
   names: { page: "うみくる", jma: "気象庁", tide: "潮汐表" },
   portMaxKm: 30,
+  palette: {
+    ecmwf: ["#2A78D6", "#3987E5"],
+    noaa: ["#EB6834", "#D95926"],
+    mf: ["#1BAF7A", "#199E70"],
+    jma: ["#6250D6", "#9085E9"],
+    tide: ["#E87BA4", "#D55181"],
+  },
   waves: [
-    { key: "ecmwf_wam025", label: "WAM", color: "#2A78D6" },
-    { key: "ncep_gfswave025", label: "GFS", color: "#EB6834" },
-    { key: "meteofrance_wave", label: "MFWAM", color: "#1BAF7A" },
-    { key: "ncep_gfswave016", label: "GFS細", color: "#EB6834", dash: true },
+    { key: "ecmwf_wam025", label: "WAM", color: "ecmwf" },
+    { key: "ncep_gfswave025", label: "GFS", color: "noaa" },
+    { key: "meteofrance_wave", label: "MFWAM", color: "mf" },
+    { key: "ncep_gfswave016", label: "GFS細", color: "noaa", dash: true },
   ],
   winds: [
-    { key: "jma_msm", label: "MSM", color: "#6250D6" },
-    { key: "jma_gsm", label: "GSM", color: "#6250D6", dash: true },
-    { key: "gfs_seamless", label: "GFS", color: "#EB6834" },
-    { key: "ecmwf_ifs025", label: "IFS", color: "#2A78D6" },
+    { key: "jma_msm", label: "MSM", color: "jma" },
+    { key: "jma_gsm", label: "GSM", color: "jma", dash: true },
+    { key: "gfs_seamless", label: "GFS", color: "noaa" },
+    { key: "ecmwf_ifs025", label: "IFS", color: "ecmwf" },
   ],
-  tideColor: "#E87BA4",
+  tideColor: "tide",
   warnNames: {
     "02": "暴風雪警報", "03": "大雨警報", "05": "暴風警報", "07": "波浪警報", "08": "高潮警報",
     "10": "大雨注意報", "14": "雷注意報", "15": "強風注意報", "16": "波浪注意報", "19": "高潮注意報", "20": "濃霧注意報",
@@ -1166,9 +1173,11 @@ function seaNext(d, now) {
 }
 
 function seaPaint(theme) {
-  if (theme.mode !== "auto") return { band: theme.track, base: theme.track, ref: theme.sub, now: theme.text, mark: theme.text, line: (hex) => ink(hex, theme) };
+  const dark = theme.mode === "dark" || theme.mode === "purple" || (theme.mode === "auto" && typeof Device !== "undefined" && Device.isUsingDarkAppearance && Device.isUsingDarkAppearance());
+  const hexOf = (c) => (SEA.palette[c] ? SEA.palette[c][dark ? 1 : 0] : c);
+  if (theme.mode !== "auto") return { band: theme.track, base: theme.track, ref: theme.sub, now: theme.text, mark: theme.text, line: (c) => (SEA.palette[c] && theme.mode !== "accessory" ? new Color(hexOf(c), theme.alpha) : ink(hexOf(c), theme)) };
   const gray = (a) => new Color("#8E8E93", a * theme.alpha);
-  return { band: gray(0.22), base: gray(0.45), ref: gray(0.9), now: gray(1), mark: gray(1), line: (hex) => new Color(hex, theme.alpha) };
+  return { band: gray(0.22), base: gray(0.45), ref: gray(0.9), now: gray(1), mark: gray(1), line: (c) => new Color(hexOf(c), theme.alpha) };
 }
 
 function seaGraph(w, h, { series, from, i, theme, refs = [], bands = [], marks = [], floor0 = true }) {
