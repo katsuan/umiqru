@@ -15,8 +15,9 @@ export function niceScale(min, max, count = 4) {
 // mini … まとめの小さいグラフ（目盛りの字・線の名前なし。触っても時刻は変えない。押すと詳しい欄へ）
 export function drawChart(el, { series, bands = [], marks = [], yFloor = null, unit = "", endLabels = true, mini = false }) {
   const W = Math.max(mini ? 120 : 280, el.clientWidth || 320);
-  const H = mini ? 72 : 200;
-  const m = mini ? { l: 2, r: 2, t: 6, b: 14 } : { l: 40, r: endLabels ? 56 : 16, t: 16, b: 24 };
+  const H = mini ? 80 : 200;
+  // 小さいグラフに満潮・干潮の時刻を書くときは、上と下に字のぶんのあき
+  const m = mini ? { l: 2, r: 2, t: marks.length ? 14 : 6, b: marks.length ? 26 : 14 } : { l: 40, r: endLabels ? 56 : 16, t: 16, b: 24 };
   const pw = W - m.l - m.r, ph = H - m.t - m.b;
   const ys = series.flatMap(s => s.points.map(p => p.y)).filter(v => v != null);
   if (!ys.length) { el.innerHTML = `<p class="muted small">この日のデータはありません。</p>`; return; }
@@ -47,7 +48,11 @@ export function drawChart(el, { series, bands = [], marks = [], yFloor = null, u
   // 満潮・干潮などの印（字は字の色）
   marks.forEach(k => {
     g += `<circle cx="${X(k.x).toFixed(1)}" cy="${Y(k.y).toFixed(1)}" r="${mini ? 2.5 : 4}" fill="var(--surface)" stroke="var(--text-2)" stroke-width="1.5"/>`;
-    if (!mini) g += `<text x="${X(k.x).toFixed(1)}" y="${(Y(k.y) + (k.up ? -10 : 16)).toFixed(1)}" text-anchor="middle">${k.label}</text>`;
+    if (mini) {
+      // 端の印は、字が枠からはみ出さないよう内側に寄せる
+      const x = Math.max(m.l + 12, Math.min(W - m.r - 12, X(k.x)));
+      g += `<text class="mini-tick" x="${x.toFixed(1)}" y="${(Y(k.y) + (k.up ? -6 : 12)).toFixed(1)}" text-anchor="middle">${k.label.replace(/^0/, "")}</text>`;
+    } else g += `<text x="${X(k.x).toFixed(1)}" y="${(Y(k.y) + (k.up ? -10 : 16)).toFixed(1)}" text-anchor="middle">${k.label}</text>`;
   });
   if (endLabels && !mini) {
     const ends = series.map(s => {

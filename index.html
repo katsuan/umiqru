@@ -63,7 +63,13 @@
   </section>
 
   <section class="card" id="sec-wave">
-    <h2><span class="ls-icon is-text" data-icon="waves" aria-hidden="true"></span>波の高さ</h2>
+    <div class="sec-head">
+      <h2><span class="ls-icon is-text" data-icon="waves" aria-hidden="true"></span>波の高さ</h2>
+      <div class="seg" role="group" aria-label="波の向きの出し方">
+        <button type="button" data-dir="16">16方位</button>
+        <button type="button" data-dir="deg">角度</button>
+      </div>
+    </div>
     <!-- ウィジェットと同じ順：4つの予報（グラフ・表）→ 気象庁の文 -->
     <ul class="legend" id="wave-legend"></ul>
     <div class="chart" id="wave-chart"></div>
@@ -78,7 +84,7 @@
   <section class="card" id="sec-wind">
     <div class="sec-head">
       <h2><span class="ls-icon is-text" data-icon="wind" aria-hidden="true"></span>風の強さ</h2>
-      <div class="seg" role="group" aria-label="風の向きの出し方">
+      <div class="seg" role="group" aria-label="風の向きの出し方（波もいっしょに変わる）">
         <button type="button" data-dir="16">16方位</button>
         <button type="button" data-dir="deg">角度</button>
       </div>

@@ -45,6 +45,7 @@ function mazume(tide) {
 
 // 3時間ごとに、予報を横に並べる表
 
+// 向き（波・風）：16方位（北北西）か角度（331°）。波と風の欄のボタンで、どちらもいっしょに切りかえる
 const windDirText = deg => deg == null ? "" : state.windDir === "deg" ? `${Math.round(((deg % 360) + 360) % 360)}°` : dirName(deg);
 
 // ---- 表示 ----
@@ -97,8 +98,8 @@ function render() {
     <tbody>${waves.map(s => `<tr>
       <th><span class="key"><i style="background:var(${s.color})"></i>${s.label}${off[s.key] ? `<span class="muted small">（${off[s.key]}km沖）</span>` : ""}</span></th>
       <td class="num">${fmt(valueAt(s, h))}</td><td class="num">${fmt(s.period[h])}</td><td class="num">${fmt(s.swell[h])}</td>
-      <td>${arrow(s.dir[h])} ${dirName(s.dir[h])}</td></tr>`).join("")}</tbody>`;
-  timeline("wave-tl", waves, 1);
+      <td>${arrow(s.dir[h])} ${windDirText(s.dir[h])}</td></tr>`).join("")}</tbody>`;
+  timeline("wave-tl", waves, 1, windDirText);
 
   // 風（気象庁の2つの計算）
   const wind = windSeries(d);
@@ -348,13 +349,13 @@ function init() {
     refreshTide();
   });
   state.hour = tokyoParts().hour;
-  document.querySelector(".seg").addEventListener("click", ev => {
+  document.querySelectorAll(".seg").forEach(seg => seg.addEventListener("click", ev => {
     const b = ev.target.closest("[data-dir]");
     if (!b || b.dataset.dir === state.windDir) return;
     state.windDir = b.dataset.dir;
     store.set("umiqru:winddir", state.windDir);
     render();
-  });
+  }));
 
   // 出どころ：1つの出どころを1行に
   const modelRow = (k, kind) => `<li><b>${kind}「${SOURCES[k].label}」</b>${esc(SOURCES[k].org)}の${esc(SOURCES[k].full)}（マス目 ${SOURCES[k].grid}）</li>`;

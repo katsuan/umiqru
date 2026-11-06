@@ -8,7 +8,7 @@
 // 新しい版が出ると通知で知らせます。入れかえ方は https://katsuan.github.io/umiqru/#howto
 // ======================================
 
-const SEA_BUILD = "ca49ecde96";
+const SEA_BUILD = "d6315b2d27";
 
 const PALETTE = {
   brand: "#6C47FF",
@@ -1180,7 +1180,8 @@ function seaGraph(w, h, { series, from, i, theme, refs = [], bands = [], marks =
   let hi = Math.max(...ys);
   if (floor0) lo = Math.min(0, lo);
   if (hi - lo < 1) hi = lo + 1;
-  const pad = 3;
+  const label = marks.length && h >= 40;
+  const pad = label ? 11 : 3;
   const X = (x) => (x / 24) * w;
   const Y = (y) => pad + (h - pad * 2) * (1 - (y - lo) / (hi - lo));
   const paint = seaPaint(theme);
@@ -1212,6 +1213,15 @@ function seaGraph(w, h, { series, from, i, theme, refs = [], bands = [], marks =
     if (x < 0 || x > 24) return;
     dc.setFillColor(paint.mark);
     dc.fillEllipse(new Rect(X(x) - 2, Y(mk.cm) - 2, 4, 4));
+    if (!label || !mk.time) return;
+    const text = mk.time.replace(/^0/, "");
+    const tw = 26;
+    const left = Math.max(0, Math.min(w - tw, X(x) - tw / 2));
+    const top = mk.k === "満潮" ? Y(mk.cm) - 11 : Y(mk.cm) + 2;
+    dc.setFont(Font.mediumSystemFont(8));
+    dc.setTextColor(paint.ref);
+    dc.setTextAlignedCenter();
+    dc.drawTextInRect(text, new Rect(left, top, tw, 10));
   });
   const nx = X(Math.min(24, Math.max(0, i - from)));
   dc.setFillColor(paint.now);
@@ -1403,14 +1413,20 @@ defineCard("sea", {
     const big = isBig(ctx);
     const wide = w >= 250;
     const main = hrow(box, 6);
+    const waveSize = big && wide ? 26 : wide ? 20 : w < 110 ? 11 : w < 150 ? 13 : 16;
+    const windSize = big ? 13 : 11;
+    const jmaText = j && j.nums.length && big && wide ? `${SEA.names.jma} ${Math.max(...j.nums)}m` : "";
+    const rowW = (jt, wt) => 24 + textWidth(waveText, waveSize) * 1.1 + 18 + (jt ? textWidth(jt, 10) * 1.1 + 6 : 0) + 8 + windSize + 6 + textWidth(`${wt}m/s`, windSize) * 1.1;
+    const showJma = jmaText && rowW(jmaText, windText) <= w;
+    const windMain = rowW(showJma ? jmaText : "", windText) <= w ? windText : windShort;
     txt(main, "🌊", big ? 15 : 12, theme.text);
-    txt(main, waveText, big && wide ? 26 : wide ? 20 : w < 110 ? 11 : w < 150 ? 13 : 16, theme.text, "round", { scale: 0.5 });
+    txt(main, waveText, waveSize, theme.text, "round", { scale: 0.5 });
     txt(main, "m", 11, theme.sub, "medium");
-    if (j && j.nums.length && big && wide) txt(main, `${SEA.names.jma} ${Math.max(...j.nums)}m`, 10, theme.sub, "semibold", { scale: 0.7 });
+    if (showJma) txt(main, jmaText, 10, theme.sub, "semibold", { scale: 0.7 });
     main.addSpacer();
     if (wide) {
-      txt(main, "💨", big ? 13 : 11, theme.text);
-      txt(main, `${windText}m/s`, big ? 13 : 11, theme.text, "semibold", { scale: 0.6 });
+      txt(main, "💨", windSize, theme.text);
+      txt(main, `${windMain}m/s`, windSize, theme.text, "semibold", { scale: 0.6 });
     } else {
       txt(box, `💨 ${w < 160 ? windShort : windText}m/s`, 10, theme.sub, "semibold", { scale: 0.6 });
     }
