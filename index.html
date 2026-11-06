@@ -137,6 +137,11 @@
   .wr-text { grid-area: text; font-size: 13px; }
   tr.on th, tr.on td { color: var(--text); font-weight: 700; }
   td.wrap { white-space: normal; }
+  th { white-space: nowrap; }
+  table.compact { font-size: 12px; }
+  table.compact th, table.compact td { padding-right: 4px; }
+  table.compact .arrow { width: 12px; height: 12px; vertical-align: -2px; }
+  table.compact .key { gap: 4px; }
   .facts dd.text { font-size: 16px; }
 </style>
 </head>
@@ -177,8 +182,8 @@
     <ul class="legend" id="wind-legend"></ul>
     <div class="chart" id="wind-chart"></div>
     <div class="table-wrap"><table id="wind-table"></table></div>
-    <h3 class="small sub" style="margin:16px 0 0;font-weight:700">3時間ごとに並べる（m/s）</h3>
-    <div class="table-wrap"><table id="wind-grid"></table></div>
+    <h3 class="small sub" style="margin:16px 0 0;font-weight:700">1時間ごとに並べる（吹いてくる向きと風速 m/s）</h3>
+    <div class="table-wrap"><table id="wind-grid" class="compact"></table></div>
   </section>
 
   <section class="card">
@@ -590,6 +595,16 @@ function grid3(series) {
     }).join("")}</tbody>`;
 }
 
+// 風：1時間ごとに、予報ごとの向きと風速
+function windGrid(series) {
+  const h = state.hour;
+  return `<thead><tr><th>時刻</th>${series.map(s => `<th><span class="key"><i style="background:var(${s.color})"></i>${s.label.replace(NAMES.jma, "")}</span></th>`).join("")}</tr></thead>
+    <tbody>${Array.from({ length: 24 }, (_, t) => `<tr${t === h ? ' class="on"' : ""}><th>${t}時</th>${series.map(s => {
+      const v = valueAt(s, t);
+      return `<td>${v == null ? "—" : `${dirName(s.dir[t])} ${fmt(v)}`}</td>`;
+    }).join("")}</tr>`).join("")}</tbody>`;
+}
+
 // ---- 表示 ----
 function setHour(h) {
   if (h === state.hour) return;
@@ -652,7 +667,7 @@ function render() {
       <td>${arrow(s.dir[h])} ${dirName(s.dir[h])}</td></tr>`).join("")}
       <tr><th>文の予報</th><td colspan="2" class="wrap">${text?.wind || `<span class="muted">${state.day <= 2 ? "なし" : "3日先まで"}</span>`}</td></tr>
     </tbody>`;
-  document.getElementById("wind-grid").innerHTML = grid3(wind);
+  document.getElementById("wind-grid").innerHTML = windGrid(wind);
 
   // 潮（夜をうすく。満潮・干潮に印）
   // 基準の高さがちがうので、どちらも「その日の平均からの差」
