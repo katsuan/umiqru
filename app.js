@@ -309,7 +309,7 @@ function drawHowto() {
     <thead><tr><th>書き方</th><th>出るもの</th></tr></thead>
     <tbody>
       <tr><td><code class="param">城ヶ島</code></td><td class="wrap">港の名前・地名で</td></tr>
-      <tr><td><code class="param">32.7987,132.4959</code></td><td class="wrap">緯度・経度で（日本の外も）</td></tr>
+      <tr><td><code class="param">20.4253,136.0814</code></td><td class="wrap">緯度・経度で（日本の外も）</td></tr>
       <tr><td><span class="muted">（空）</span></td><td class="wrap">今いる場所</td></tr>
       <tr><td><code class="param">城ヶ島,wave,wind</code></td><td class="wrap">書いたものだけを書いた順に（wave 波・tide 潮・wind 風）</td></tr>
       <tr><td><code class="param">城ヶ島,wind,deg</code></td><td class="wrap">風の表だけ・向きを角度で</td></tr>
@@ -395,7 +395,7 @@ function init() {
     ev.currentTarget.querySelector("summary .sub").textContent = open ? "閉じる" : "開く";
     if (open) loadScript().catch(() => {});
   });
-  // ?q=32.7987,132.4959 や ?q=城ヶ島 のリンクで、その場所を開く
+  // ?q=20.4253,136.0814 や ?q=城ヶ島 のリンクで、その場所を開く
   const q = new URLSearchParams(location.search).get("q");
   const last = (store.get("umiqru:recent") || [])[0];
   if (q) findPlace(q).then(go).catch(e => { statusEl().textContent = e.message; });

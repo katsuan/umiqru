@@ -4,11 +4,11 @@
 
 // ======================================
 // うみくる（UmiQru）のウィジェット
-// ウィジェットの Parameter に場所を書くと、その場所の波・風・潮・天気が出ます（例：城ヶ島 / 32.7987,132.4959）。
+// ウィジェットの Parameter に場所を書くと、その場所の波・風・潮・天気が出ます（例：城ヶ島 / 20.4253,136.0814）。
 // 新しい版が出ると通知で知らせます。入れかえ方は https://katsuan.github.io/umiqru/#howto
 // ======================================
 
-const SEA_BUILD = "3b21ca59ba";
+const SEA_BUILD = "79b0b9a0b6";
 
 const PALETTE = {
   brand: "#6C47FF",
@@ -1355,7 +1355,7 @@ defineCard("sea", {
   icon: "🌊",
   label: "海",
   aliases: ["umi", "marine", "海", "波", "釣り"],
-  help: `波・風・潮をグラフで（sea:城ヶ島 / sea:32.7987,132.4959 / 空なら今いる場所 / sea:城ヶ島,wave,wind で出すものを選ぶ（wave 波・tide 潮・wind 風） / deg で風の向きを角度に。アプリの「🌊 海の Parameter を作る」で作れる）。${SEA.names.jma}の波の文と警報・注意報、近い港の${SEA.names.tide}を先に、緯度経度で読む波4つ・風4つの予報をあとに。押すと${SEA.names.page}が開く`,
+  help: `波・風・潮をグラフで（sea:城ヶ島 / sea:20.4253,136.0814 / 空なら今いる場所 / sea:城ヶ島,wave,wind で出すものを選ぶ（wave 波・tide 潮・wind 風） / deg で風の向きを角度に。アプリの「🌊 海の Parameter を作る」で作れる）。${SEA.names.jma}の波の文と警報・注意報、近い港の${SEA.names.tide}を先に、緯度経度で読む波4つ・風4つの予報をあとに。押すと${SEA.names.page}が開く`,
   keep: (d) => d,
   load: loadSea,
   refreshAt(d, ctx) {
@@ -1564,7 +1564,7 @@ async function seaMenu() {
   const last = readCache("sea_menu") || {};
   const ask = new Alert();
   ask.title = "🌊 海（sea）の場所";
-  ask.message = "港の名前・地名・緯度経度（例：城ヶ島 / 鴨川 / 32.7987,132.4959）。空なら今いる場所";
+  ask.message = "港の名前・地名・緯度経度（例：城ヶ島 / 鴨川 / 20.4253,136.0814）。空なら今いる場所";
   ask.addTextField("城ヶ島", last.place || "");
   ask.addAction("次へ");
   ask.addCancelAction("やめる");

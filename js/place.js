@@ -19,7 +19,7 @@ export function km(a, b) {
 // 港の名前にそのまま当たれば港の位置。なければ地名（人口の多いほう）。それでもなければ港の名前の一部
 export async function findPlace(text) {
   text = text.trim();
-  // 「(32.79, 132.49)」「32.79,132.49」「32.79 132.49」など。かっこ・全角もよい
+  // 「(20.43, 136.08)」「20.43,136.08」「20.43 136.08」など。かっこ・全角もよい
   const plain = text.replace(/[（(）)\[\]]/g, "").replace(/[，、]/g, ",").replace(/[０-９．－]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0)).trim();
   const ll = plain.match(/^(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)$/);
   if (ll) return { name: `${(+ll[1]).toFixed(4)}, ${(+ll[2]).toFixed(4)}`, lat: +ll[1], lon: +ll[2], coords: true };
