@@ -28,6 +28,10 @@ export function tideRange(tide) {
   const cm = Math.round(Math.max(...tide.flood.map(t => t.cm)) - Math.min(...tide.edd.map(t => t.cm)));
   return `潮位差 ${(Math.round(cm / 10) / 10).toFixed(1)}m`;
 }
+// その日の満潮・干潮を時刻の順に（k は「満潮」「干潮」）。hm … "4:57" を時間（4.95）に
+export const tideEvents = (tide, hm) => tide
+  ? [...tide.flood.map(t => ({ ...t, k: "満潮" })), ...tide.edd.map(t => ({ ...t, k: "干潮" }))].sort((a, b) => hm(a.time) - hm(b.time))
+  : [];
 export const fmt = (v, d = 1) => v == null || Number.isNaN(v) ? "—" : v.toFixed(d);
 export const DIRS = ["北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東", "南", "南南西", "南西", "西南西", "西", "西北西", "北西", "北北西"];
 // 風の向き：16方位（北北西）か角度（331°）。ボタンで切りかえる
