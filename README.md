@@ -43,7 +43,7 @@
 
 ## 公開のしかた
 
-- いまは main をそのまま GitHub Pages に出している（ためしの間）
+- いまは main を `.github/workflows/pages.yml` で GitHub Pages に出している（ためしの間）。出すときに Q キットの `qpublish.py` で CSS・JS に `?v=` を付ける（リポジトリの中には付けない）
 - Q 共通の公開（katsuan/oqrn の `q-pages.yml`。テストは非公開の q-dev）に切りかえるときは、このリポジトリの secret に `Q_DEV_KEY` を登録してから `.github/workflows/pages.yml` を足す
 - ページの下の「なかまのツール」の行は Q キットの `tool-share.js`（中身は q-oqrn の `data/hub-links.json` の umiqru）
 

@@ -1,4 +1,4 @@
-# 公開：main に push したら、そのまま GitHub Pages に出す（ためしの間）。
+# 公開：main に push したら、出すものだけを写し、読み込む CSS・JS に ?v= を付けて GitHub Pages に出す（ためしの間）。
 # Q 共通の公開（katsuan/oqrn の q-pages.yml。テストは非公開の q-dev）に切りかえるときは、secret Q_DEV_KEY を登録してから、この中身を入れかえる
 name: 公開
 
@@ -28,6 +28,15 @@ jobs:
         run: |
           mkdir _site
           cp -R index.html app.js style.css sw.js manifest.webmanifest js data *.png *.svg SQriptableSea.js sea-version.json .nojekyll _site/
+      - name: Q キットの道具（?v= を付ける qpublish.py）
+        uses: actions/checkout@v5
+        with:
+          repository: katsuan/oqrn
+          path: q-oqrn
+      - name: ?v= を付ける（iPhone などに前の CSS・JS が残って、直したはずの見た目が出ないのを防ぐ）
+        run: |
+          kit=$(curl -fsS "https://katsuan.github.io/oqrn/shared/version.txt?t=$(date +%s)" | tr -d '[:space:]' || true)
+          python3 q-oqrn/tools/qpublish.py _site --kit "$kit" --commit "$GITHUB_SHA"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
