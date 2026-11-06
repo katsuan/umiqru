@@ -63,14 +63,14 @@
     background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
     padding: 8px 16px; height: 40px;
   }
-  button {
+  :is(.controls, .seg, .copyrow) button {
     font: inherit; font-size: 14px; color: var(--text-2);
     background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
     padding: 4px 16px; height: 40px; cursor: pointer; white-space: nowrap;
     display: inline-flex; align-items: center; gap: 8px;
   }
-  button.primary { color: var(--surface); background: var(--accent); border-color: var(--accent); }
-  button[aria-pressed="true"] { color: var(--surface); background: var(--accent); border-color: var(--accent); }
+  :is(.controls, .seg, .copyrow) button.primary { color: var(--surface); background: var(--accent); border-color: var(--accent); }
+  :is(.controls, .seg, .copyrow) button[aria-pressed="true"] { color: var(--surface); background: var(--accent); border-color: var(--accent); }
   .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
   .chips::-webkit-scrollbar { display: none; }
   .chips button { flex: 0 0 auto; }
