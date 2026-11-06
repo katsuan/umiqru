@@ -282,8 +282,10 @@ function km(a, b) {
 // 港の名前にそのまま当たれば港の位置。なければ地名（人口の多いほう）。それでもなければ港の名前の一部
 async function findPlace(text) {
   text = text.trim();
-  const ll = text.match(/^(-?\d+(?:\.\d+)?)\s*[,、 ]\s*(-?\d+(?:\.\d+)?)$/);
-  if (ll) return { name: `${(+ll[1]).toFixed(2)}, ${(+ll[2]).toFixed(2)}`, lat: +ll[1], lon: +ll[2] };
+  // 「(32.79, 132.49)」「32.79,132.49」「32.79 132.49」など。かっこ・全角もよい
+  const plain = text.replace(/[（(）)\[\]]/g, "").replace(/[，、]/g, ",").replace(/[０-９．－]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0)).trim();
+  const ll = plain.match(/^(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)$/);
+  if (ll) return { name: `${(+ll[1]).toFixed(4)}, ${(+ll[2]).toFixed(4)}`, lat: +ll[1], lon: +ll[2], coords: true };
   const ports = await loadPorts();
   const exact = ports.find(p => p.name === text);
   if (exact) return { name: exact.name, lat: exact.lat, lon: exact.lon };
@@ -689,7 +691,7 @@ function render() {
   const wr = range(waveSeries(d).map(s => valueAt(s, h)));
   const sst = sliceDay(d.sea?.hourly?.sea_surface_temperature, state.day)[h];
   document.getElementById("summary").innerHTML = `
-    <div class="summary-head"><strong>${state.place.name}</strong><span class="sub">${day.short} ${h}時${ctx.jma ? "" : "（日本時間）"}</span></div>
+    <div class="summary-head"><strong>${state.place.name}${state.place.coords && ctx.jma ? `（${ctx.jma.muniName}）` : ""}</strong><span class="sub">${day.short} ${h}時${ctx.jma ? "" : "（日本時間）"}</span></div>
     <p class="where">潮：${ctx.port ? `${ctx.port.name}の港（${ctx.port.km.toFixed(0)}km）` : "—"}　${NAMES.jma}：${ctx.jma ? ctx.jma.name : "—"}</p>
     <dl class="facts">
       <div><dt>波（${NAMES.jma}）</dt><dd>${waveTop == null ? "—" : fmt(waveTop)}<span class="unit">${waveTop == null ? "" : "m まで"}</span><span class="note">${text?.wave || (!ctx.jma ? "日本だけ" : state.day > 2 ? "3日先まで" : "")}</span></dd></div>
@@ -785,8 +787,11 @@ function init() {
   let t;
   window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(render, 150); });
   drawRecent();
+  // ?q=32.7987,132.4959 や ?q=城ヶ島 のリンクで、その場所を開く
+  const q = new URLSearchParams(location.search).get("q");
   const last = (store.get("marine-compare:recent") || [])[0];
-  if (last) go(last);
+  if (q) findPlace(q).then(go).catch(e => { statusEl().textContent = e.message; });
+  else if (last) go(last);
   else findPlace(DEFAULT_PLACE).then(go).catch(e => { statusEl().textContent = e.message; });
 }
 init();
