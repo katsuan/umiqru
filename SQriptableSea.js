@@ -8,7 +8,7 @@
 // 新しい版が出ると通知で知らせます。入れかえ方は https://katsuan.github.io/umiqru/#howto
 // ======================================
 
-const SEA_BUILD = "fb55182132";
+const SEA_BUILD = "df3fe46310";
 
 const PALETTE = {
   brand: "#6C47FF",
@@ -971,16 +971,16 @@ const SEA = {
   names: { page: "うみくる", jma: "気象庁", tide: "潮汐表" },
   portMaxKm: 30,
   waves: [
-    { key: "ecmwf_wam025", label: "欧州", color: "#2A78D6" },
-    { key: "ncep_gfswave025", label: "米国", color: "#EB6834" },
-    { key: "meteofrance_wave", label: "仏", color: "#1BAF7A" },
-    { key: "ncep_gfswave016", label: "米細", color: "#EDA100" },
+    { key: "ecmwf_wam025", label: "WAM", color: "#2A78D6" },
+    { key: "ncep_gfswave025", label: "GFS", color: "#EB6834" },
+    { key: "meteofrance_wave", label: "MFWAM", color: "#1BAF7A" },
+    { key: "ncep_gfswave016", label: "GFS細", color: "#EDA100" },
   ],
   winds: [
     { key: "jma_msm", label: "MSM", color: "#008300" },
     { key: "jma_gsm", label: "GSM", color: "#2A78D6" },
-    { key: "ecmwf_ifs025", label: "欧州", color: "#EB6834" },
-    { key: "gfs_seamless", label: "米国", color: "#6250D6" },
+    { key: "ecmwf_ifs025", label: "IFS", color: "#EB6834" },
+    { key: "gfs_seamless", label: "GFS", color: "#6250D6" },
   ],
   tideColor: "#E87BA4",
   warnNames: {
