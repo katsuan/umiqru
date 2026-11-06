@@ -12,10 +12,11 @@ export function niceScale(min, max, count = 4) {
   const step = steps.find(s => s >= raw) || 100;
   return { min: Math.floor(min / step) * step, max: Math.ceil(max / step) * step, step };
 }
-export function drawChart(el, { series, bands = [], marks = [], yFloor = null, unit = "", endLabels = true }) {
-  const W = Math.max(280, el.clientWidth || 320);
-  const H = 200;
-  const m = { l: 40, r: endLabels ? 56 : 16, t: 16, b: 24 };
+// mini … まとめの小さいグラフ（目盛りの字・線の名前なし。触っても時刻は変えない。押すと詳しい欄へ）
+export function drawChart(el, { series, bands = [], marks = [], yFloor = null, unit = "", endLabels = true, mini = false }) {
+  const W = Math.max(mini ? 120 : 280, el.clientWidth || 320);
+  const H = mini ? 72 : 200;
+  const m = mini ? { l: 2, r: 2, t: 6, b: 14 } : { l: 40, r: endLabels ? 56 : 16, t: 16, b: 24 };
   const pw = W - m.l - m.r, ph = H - m.t - m.b;
   const ys = series.flatMap(s => s.points.map(p => p.y)).filter(v => v != null);
   if (!ys.length) { el.innerHTML = `<p class="muted small">この日のデータはありません。</p>`; return; }
@@ -30,10 +31,10 @@ export function drawChart(el, { series, bands = [], marks = [], yFloor = null, u
   for (let v = sc.min; v <= sc.max + 1e-9; v += sc.step) {
     const y = Y(v).toFixed(1);
     g += `<line x1="${m.l}" x2="${m.l + pw}" y1="${y}" y2="${y}" stroke="var(--grid)" stroke-width="1"/>`;
-    g += `<text x="${m.l - 8}" y="${y}" text-anchor="end" dominant-baseline="middle">${+v.toFixed(2)}</text>`;
+    if (!mini) g += `<text x="${m.l - 8}" y="${y}" text-anchor="end" dominant-baseline="middle">${+v.toFixed(2)}</text>`;
   }
-  const every = pw < 320 ? 6 : 3;
-  for (let h = 0; h <= 24; h += every) g += `<text x="${X(h).toFixed(1)}" y="${H - 6}" text-anchor="middle">${h}時</text>`;
+  const every = mini || pw < 320 ? 6 : 3;
+  for (let h = mini ? 6 : 0; h <= (mini ? 18 : 24); h += every) g += `<text x="${X(h).toFixed(1)}" y="${H - (mini ? 2 : 6)}" text-anchor="middle"${mini ? ' class="mini-tick"' : ""}>${h}${mini ? "" : "時"}</text>`;
   series.forEach(s => {
     let d = "", pen = false;
     s.points.forEach(p => {
@@ -41,14 +42,14 @@ export function drawChart(el, { series, bands = [], marks = [], yFloor = null, u
       d += `${pen ? "L" : "M"}${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`;
       pen = true;
     });
-    if (d) g += `<path d="${d}" fill="none" stroke="var(${s.color})" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    if (d) g += `<path d="${d}" fill="none" stroke="var(${s.color})" stroke-width="${mini ? 1.5 : 2}" stroke-linejoin="round" stroke-linecap="round"/>`;
   });
   // 満潮・干潮などの印（字は字の色）
   marks.forEach(k => {
-    g += `<circle cx="${X(k.x).toFixed(1)}" cy="${Y(k.y).toFixed(1)}" r="4" fill="var(--surface)" stroke="var(--text-2)" stroke-width="1.5"/>`;
-    g += `<text x="${X(k.x).toFixed(1)}" y="${(Y(k.y) + (k.up ? -10 : 16)).toFixed(1)}" text-anchor="middle">${k.label}</text>`;
+    g += `<circle cx="${X(k.x).toFixed(1)}" cy="${Y(k.y).toFixed(1)}" r="${mini ? 2.5 : 4}" fill="var(--surface)" stroke="var(--text-2)" stroke-width="1.5"/>`;
+    if (!mini) g += `<text x="${X(k.x).toFixed(1)}" y="${(Y(k.y) + (k.up ? -10 : 16)).toFixed(1)}" text-anchor="middle">${k.label}</text>`;
   });
-  if (endLabels) {
+  if (endLabels && !mini) {
     const ends = series.map(s => {
       const last = [...s.points].reverse().find(p => p.y != null);
       return last ? { s, x: X(last.x), y: Y(last.y) } : null;
@@ -63,12 +64,13 @@ export function drawChart(el, { series, bands = [], marks = [], yFloor = null, u
   g += `<line x1="${hx}" x2="${hx}" y1="${m.t}" y2="${m.t + ph}" stroke="var(--text-2)" stroke-width="1"/>`;
   series.forEach(s => {
     const near = s.points.reduce((b, p) => Math.abs(p.x - state.hour) < Math.abs(b.x - state.hour) ? p : b, s.points[0]);
-    if (near?.y != null) g += `<circle cx="${hx}" cy="${Y(near.y).toFixed(1)}" r="4" fill="var(${s.color})" stroke="var(--surface)" stroke-width="2"/>`;
+    if (near?.y != null) g += `<circle cx="${hx}" cy="${Y(near.y).toFixed(1)}" r="${mini ? 3 : 4}" fill="var(${s.color})" stroke="var(--surface)" stroke-width="2"/>`;
   });
 
   // qcheck-ok: W1 グラフの絵は数と決まった名前だけ（満潮・干潮の時刻と名前は esc 済み）
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="${esc(series.map(s => s.label).join("・"))}（単位 ${esc(unit)}）。触った時刻の値は下の表">${g}</svg>`;
   const svg = el.querySelector("svg");
+  if (mini) return;
   const pick = ev => {
     const r = svg.getBoundingClientRect();
     const x = (ev.clientX - r.left) * (W / r.width);
