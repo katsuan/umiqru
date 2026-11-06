@@ -54,15 +54,21 @@ export function rainCell(pct) {
   const a = Math.min(0.85, 0.12 + (pct / 100) * 0.73);
   return ` style="background:rgba(42,120,214,${a.toFixed(2)})${a >= 0.55 ? ";color:#fff" : ""}"`;
 }
+// 雨：表に出す数（小数1けた）で決める（同じ数なら同じ色）
 export function rainMmCell(mm) {
-  if (mm == null || mm <= 0) return "";
-  return rainCell(Math.min(100, 30 + mm * 14));
+  const v = mm == null ? null : Math.round(mm * 10) / 10;
+  if (v == null || v <= 0) return "";
+  return rainCell(Math.min(100, 30 + v * 14));
 }
+// 気温：表に出す数（整数）で決め、濃さは段で（同じ数なら同じ色）。18℃ のまわり（17〜19℃）は色なし
+//   18℃ からの差 2〜4・5〜8・9〜12・13〜 で4段。寒いと青、暑いと橙
 export function tempCell(t) {
   if (t == null) return "";
-  const diff = t - 18;
-  const a = Math.min(0.7, (Math.abs(diff) / 14) * 0.7);
-  if (a < 0.06) return "";
+  const diff = Math.round(t) - 18;
+  const d = Math.abs(diff);
+  const step = d <= 1 ? 0 : d <= 4 ? 1 : d <= 8 ? 2 : d <= 12 ? 3 : 4;
+  if (!step) return "";
+  const a = step * 0.17;
   const rgb = diff < 0 ? "42,120,214" : "235,104,52";
   return ` style="background:rgba(${rgb},${a.toFixed(2)})${a >= 0.55 ? ";color:#fff" : ""}"`;
 }
