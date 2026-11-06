@@ -1,0 +1,16 @@
+{
+  "name": "うみくる（UmiQru）",
+  "short_name": "うみくる",
+  "description": "海のごきげん、くらべて先どり。同じ場所の波・風・潮・天気を、気象庁と世界の予報でくらべる。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f6f4",
+  "theme_color": "#0e6e9e",
+  "lang": "ja",
+  "icons": [
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}

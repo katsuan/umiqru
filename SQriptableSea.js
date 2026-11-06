@@ -3,7 +3,7 @@
 // icon-color: blue; icon-glyph: water;
 
 // ======================================
-// SQriptable Sea（海の予報くらべのウィジェット）
+// SQriptable Sea（うみくるのウィジェット）
 // SQriptable.js（0.40.3）から sea カードの部分だけを切り出したもの。
 // 直すときは SQriptable.js を直して、tools/build-sea.mjs で作りなおす（このファイルを直接直さない）
 // ======================================
@@ -1581,9 +1581,9 @@ function shortPlace(name) {
 /** 今の時刻のぶん（なければいちばん近い時刻） */
 
 const SEA = {
-  page: "https://katsuan.github.io/q-marine-test/",
+  page: "https://katsuan.github.io/umiqru/",
   // 画面に出す出どころの名前（ここだけに書く）
-  names: { jma: "気象庁", tide: "潮汐表" },
+  names: { page: "うみくる", jma: "気象庁", tide: "潮汐表" },
   portMaxKm: 30, // これより遠い港の潮汐表は使わない（日本の外・沖の遠く）
   // 線の色はグラフごとの並びで検証ずみ（色の見分けやすさ）。字は ink で背景に合わせる
   waves: [
@@ -1989,18 +1989,26 @@ function seaPlot(box, img, w, h) {
   view.imageSize = new Size(w, h);
 }
 
-function seaWaveGraph(box, d, ctx, view, w, h) {
-  const j = d.jma[Math.floor(view.i / 24)] || d.jma[0];
-  const refs = j && j.nums.length ? [{ y: Math.max(...j.nums) }] : [];
-  seaPlot(box, seaGraph(w, h, { series: d.waves, from: view.from, i: view.i, theme: ctx.theme, refs }), w, h);
-}
+/** 夜（日の入り〜日の出）の時間。今日の0時からの時間で。日の出入りがなければ（日本の港がない）空 */
 
-function seaTideGraph(box, d, ctx, view, w, h) {
+function seaNightBands(d) {
+  if (!(d.sun || []).length) return [];
   const bands = [{ from: -24, to: 0 }];
-  (d.sun || []).forEach((s, k) => {
+  d.sun.forEach((s, k) => {
     bands[bands.length - 1].to = s.rise / 60;
     bands.push({ from: s.set / 60, to: (k + 1) * 24 + 24 });
   });
+  return bands;
+}
+
+function seaWaveGraph(box, d, ctx, view, w, h) {
+  const j = d.jma[Math.floor(view.i / 24)] || d.jma[0];
+  const refs = j && j.nums.length ? [{ y: Math.max(...j.nums) }] : [];
+  seaPlot(box, seaGraph(w, h, { series: d.waves, from: view.from, i: view.i, theme: ctx.theme, refs, bands: seaNightBands(d) }), w, h);
+}
+
+function seaTideGraph(box, d, ctx, view, w, h) {
+  const bands = seaNightBands(d);
   const tide = [{ color: SEA.tideColor, step: 1 / 3, v: d.tide.map((p) => p.cm) }];
   seaPlot(box, seaGraph(w, h, { series: tide, from: view.from, i: view.i, theme: ctx.theme, bands, marks: d.tideMarks, floor0: false }), w, h);
 }
@@ -2065,7 +2073,7 @@ defineCard("sea", {
   icon: "🌊",
   label: "海",
   aliases: ["umi", "marine", "海", "波", "釣り"],
-  help: `波・風・潮をグラフで（sea:城ヶ島 / sea:32.7987,132.4959 / 空なら今いる場所 / sea:城ヶ島,wave,wind で出すものを選ぶ（wave 波・tide 潮・wind 風） / deg で風の向きを角度に。アプリの「🌊 海の Parameter を作る」で作れる）。${SEA.names.jma}の波の文と警報・注意報、近い港の${SEA.names.tide}を先に、緯度経度で読む波4つ・風4つの予報をあとに。押すと海の予報くらべが開く`,
+  help: `波・風・潮をグラフで（sea:城ヶ島 / sea:32.7987,132.4959 / 空なら今いる場所 / sea:城ヶ島,wave,wind で出すものを選ぶ（wave 波・tide 潮・wind 風） / deg で風の向きを角度に。アプリの「🌊 海の Parameter を作る」で作れる）。${SEA.names.jma}の波の文と警報・注意報、近い港の${SEA.names.tide}を先に、緯度経度で読む波4つ・風4つの予報をあとに。押すと${SEA.names.page}が開く`,
   keep: (d) => d,
   load: loadSea,
   refreshAt(d, ctx) {
@@ -2203,7 +2211,7 @@ defineCard("sea", {
         col.addSpacer();
       } else {
         seaLegend(col, "風 m/s", d.winds, 9, theme, cw);
-        seaPlot(col, seaGraph(cw, gh, { series: d.winds, from: view.from, i, theme }), cw, gh);
+        seaPlot(col, seaGraph(cw, gh, { series: d.winds, from: view.from, i, theme, bands: seaNightBands(d) }), cw, gh);
       }
     };
     const chosen = d.opt && d.opt.show && d.opt.show.length ? d.opt.show : null;
