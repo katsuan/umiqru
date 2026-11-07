@@ -38,10 +38,11 @@
   <form class="controls" id="place-form" autocomplete="off">
     <div class="place">
       <label class="vh" for="place-input">場所</label>
-      <input type="search" id="place-input" placeholder="港・地名（例：城ヶ島、鴨川）" enterkeyhint="search">
+      <input type="search" id="place-input" placeholder="港・地名・緯度経度" enterkeyhint="search" aria-describedby="place-hint">
       <button type="submit" class="primary">見る</button>
       <button type="button" id="here" aria-label="今いる場所"><span class="ls-icon" data-icon="place" aria-hidden="true"></span></button>
     </div>
+    <p class="place-hint" id="place-hint">例：城ヶ島、鴨川、32.80, 132.49（緯度, 経度）</p>
     <div class="chips" id="recent"></div>
     <div class="chips" id="days" role="group" aria-label="日にち"></div>
   </form>

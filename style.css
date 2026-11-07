@@ -77,6 +77,7 @@
   .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
   .seg button { border: none; border-radius: 0; height: 32px; padding: 0 12px; font-size: 13px; }
   .seg button + button { border-left: 1px solid var(--line); }
+  .place-hint { font-size: 13px; color: var(--text-3); margin: 0; }
   .chips button.recent { height: 32px; font-size: 13px; }
 
   .card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
