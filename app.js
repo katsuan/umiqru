@@ -219,8 +219,12 @@ function render() {
     <div class="summary-head"><strong>${esc(state.place.alts ? baseName(state.place.name) : state.place.name)}${(state.place.coords || state.place.alts || state.place.pinned) && ctx.jma ? `（${esc(ctx.jma.muniName)}）` : ""}</strong><span class="sub">${day.short} ${h}時${ctx.jma ? "" : "（日本時間）"}</span></div>
     <p class="where">潮：${ctx.port ? `${esc(ctx.port.name)}の港（${ctx.port.km.toFixed(0)}km）` : "—"}　${NAMES.jma}：${ctx.jma ? esc(ctx.jma.name) : "—"}</p>
     ${state.place.alts ? `<details class="alts"${altsOpen ? " open" : ""}><summary>ほかにも「${esc(baseName(state.place.name))}」があります（${state.place.alts.length}か所）</summary>
-      <ul>${state.place.alts.map((a, i) => `<li><button type="button" data-alt="${i}"><span>${esc(a.label)}</span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></button></li>`).join("")}</ul></details>` : ""}
-    <div class="share-row">${window.OQRN ? `<a class="ls-button line is-oqrn" id="send-card" href="#">カードでおくるん</a>` : ""}<button type="button" class="ls-button" id="share-link"><span class="ls-icon is-text" data-icon="${navigator.share ? "share" : "link"}" aria-hidden="true"></span>${navigator.share ? "リンクを共有" : "リンクをコピー"}</button></div>`;
+      <ul>${state.place.alts.map((a, i) => `<li><button type="button" data-alt="${i}"><span>${esc(a.label)}</span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></button></li>`).join("")}</ul></details>` : ""}`;
+  const shareBox = document.getElementById("share");
+  shareBox.hidden = false;
+  shareBox.innerHTML = `<h2 class="share-title">${esc(baseName(state.place.name))}の海を送る</h2>
+    <div class="share-row">${window.OQRN ? `<a class="ls-button line is-oqrn" id="send-card" href="#">カードでおくるん</a>` : ""}<button type="button" class="ls-button" id="share-link"><span class="ls-icon is-text" data-icon="${navigator.share ? "share" : "link"}" aria-hidden="true"></span>${navigator.share ? "リンクを共有" : "リンクをコピー"}</button></div>
+    <p class="muted small share-note">カードには ${day.short} ${h}時のめやす（波・風・潮・天気・水温）が入り、カードのボタンからこの場所の${NAMES.app}が開きます。</p>`;
   document.getElementById("summary").innerHTML = `
     <div class="minis">
       <a class="mini" href="#sec-wave"><span class="mini-title">${waveIcon}波 m<span class="go ls-icon" data-icon="next" aria-hidden="true"></span></span><div id="mini-wave"></div></a>
@@ -320,14 +324,14 @@ const shareUrl = () => `${location.origin}${location.pathname}?q=${encodeURIComp
 let altsOpen = false;
 const placeInfo = document.getElementById("place-info");
 placeInfo.addEventListener("toggle", ev => { if (ev.target.matches("details.alts")) altsOpen = ev.target.open; }, true);
-placeInfo.addEventListener("click", ev => {
+document.getElementById("share").addEventListener("click", ev => {
   const share = ev.target.closest("#share-link");
-  if (share) {
-    const url = shareUrl();
-    if (navigator.share) navigator.share({ title: `${baseName(state.place.name)}の海｜${NAMES.app}`, url }).catch(() => {});
-    else copyText(() => url, share);
-    return;
-  }
+  if (!share) return;
+  const url = shareUrl();
+  if (navigator.share) navigator.share({ title: `${baseName(state.place.name)}の海｜${NAMES.app}`, url }).catch(() => {});
+  else copyText(() => url, share);
+});
+placeInfo.addEventListener("click", ev => {
   const b = ev.target.closest("[data-alt]");
   const cur = state.place, a = b && cur?.alts?.[Number(b.dataset.alt)];
   if (!a) return;
