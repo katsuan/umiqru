@@ -320,7 +320,7 @@ function drawHowto() {
     <li>${S} を開き、右上の「＋」を押す。白い画面を長押しして「ペースト」。</li>
     <li>上の名前（Untitled Script）を押して「${W}」に変え、左上の「Done」で閉じる。</li>
     <li>一覧の「${W}」を押すと、場所と出すものを選んで、その場で見られる（今いる場所を使うときは、位置情報を許可する）。</li>
-    <li>ホーム画面のあいている所を長押し → 左上の「編集」→「ウィジェットを追加」→「${S}」→ 大きさを選ぶ（大がいちばん多く出る）→「ウィジェットを追加」。</li>
+    <li>ホーム画面のあいている所を長押し → 左上の「編集」→「ウィジェットを追加」→「${S}」→ 大きさを選ぶ（大がいちばん情報が多い）→「ウィジェットを追加」。</li>
     <li>置いたウィジェットを長押し →「ウィジェットを編集」→ Script で「${W}」を選び、Parameter に場所を書く。いま見ている場所なら：
       <div class="copyrow"><code class="param" id="howto-param">${esc(param)}</code><button type="button" id="copy-param"><span class="ls-icon" data-icon="copy" aria-hidden="true"></span>コピー</button></div></li>
     <li>ホーム画面にもどると表示される。ウィジェットを押すと、このページがその場所で開く。</li>`;
