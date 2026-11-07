@@ -86,3 +86,8 @@ export function meanDir(list) {
   const spread = Math.max(...list.map(m => Math.abs((((m.dir - deg) % 360) + 540) % 360 - 180)));
   return { deg, spread, calm: Math.hypot(x, y) < 0.5 };
 }
+
+// 予報のはばの書き方（ひとつだけ、ほぼ同じなら1つの数）。v … range() の結果
+export const spread = v => v.n > 1 && v.hi - v.lo >= 0.05 ? `${fmt(v.lo)}〜${fmt(v.hi)}` : fmt(v.hi);
+// 「鵜来島（宿毛市）」→「鵜来島」（同じ名前の場所を選びなおしたときに添えた地域を外す）
+export const baseName = name => name.replace(/（.+）$/, "");

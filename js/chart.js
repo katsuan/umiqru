@@ -23,6 +23,7 @@ export function drawChart(el, { series, bands = [], marks = [], yFloor = null, u
   const m = mini ? { l: 2, r: 2, t: marks.length ? 14 : 6, b: (marks.length ? 26 : 14) + AH } : { l: 40, r: endLabels ? 56 : 16, t: 16, b: 24 + AH };
   const pw = W - m.l - m.r, ph = H - m.t - m.b;
   const ys = series.flatMap(s => s.points.map(p => p.y)).filter(v => v != null);
+  // qcheck-ok: W1 決まった文字だけ
   if (!ys.length) { el.innerHTML = `<p class="muted small">${waiting ? "読みこみ中…" : "この日のデータはありません。"}</p>`; return; }
   let lo = Math.min(...ys), hi = Math.max(...ys);
   if (yFloor != null) lo = Math.min(yFloor, lo);
