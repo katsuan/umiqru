@@ -8,7 +8,7 @@
 // 新しい版が出ると通知で知らせます。入れかえ方は https://katsuan.github.io/umiqru/#howto
 // ======================================
 
-const SEA_BUILD = "b5c6e97694";
+const SEA_BUILD = "ac9b23079e";
 
 const PALETTE = {
   brand: "#6C47FF",
@@ -1507,16 +1507,16 @@ defineCard("sea", {
     };
     const gustLine = (d.gust || []).some((v) => v != null) ? [{ label: "突風", dash: true, thin: true, v: d.gust }] : [];
     const extra = (g) => (g === "wind" ? SEA_ARROW_H + 2 : 0);
-    const drawOne = (col, g, cw, gh) => {
+    const drawOne = (col, g, cw, gh, keys = true) => {
       if (g === "wave") {
-        seaLegend(col, "波 m", waveItems, 9, theme, cw);
+        seaLegend(col, "波 m", keys ? waveItems : [], 9, theme, cw);
         seaWaveGraph(col, d, ctx, view, cw, gh);
       } else if (g === "tide") {
         seaLegend(col, tideTitle(cw), [], 9, theme, cw);
         if (d.tide.length) seaTideGraph(col, d, ctx, view, cw, gh);
         else txt(col, `${SEA.names.tide}は日本の港だけ`, 9, theme.sub, "medium");
       } else {
-        seaLegend(col, "風 m/s", [...d.winds.filter((m) => m.v.some((v) => v != null)), ...gustLine], 9, theme, cw);
+        seaLegend(col, "風 m/s", keys ? [...d.winds.filter((m) => m.v.some((v) => v != null)), ...gustLine] : [], 9, theme, cw);
         seaPlot(col, seaGraph(cw, gh - extra(g), { series: [...d.winds, ...gustLine], from: view.from, i, theme, bands: seaNightBands(d) }), cw, gh - extra(g));
         col.addSpacer(2);
         seaWindArrows(col, d, ctx, view, cw);
@@ -1537,7 +1537,7 @@ defineCard("sea", {
         const col = row.addStack();
         col.layoutVertically();
         col.size = new Size(cw, 0);
-        drawOne(col, g, cw, gh);
+        drawOne(col, g, cw, gh, false);
         col.addSpacer(2);
         hourAxis(col, view.axis, cw, 8, theme);
       });
