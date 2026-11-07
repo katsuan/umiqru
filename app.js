@@ -216,8 +216,10 @@ function render() {
   const waveIcon = `<span class="ls-icon is-text" data-icon="waves" aria-hidden="true"></span>`;
   const moonIcon = `<span class="ls-icon is-text" data-icon="moon" aria-hidden="true"></span>`;
   document.getElementById("place-info").innerHTML = `
-    <div class="summary-head"><strong>${esc(state.place.name)}${state.place.coords && ctx.jma ? `（${esc(ctx.jma.muniName)}）` : ""}</strong><span class="sub">${day.short} ${h}時${ctx.jma ? "" : "（日本時間）"}</span></div>
-    <p class="where">潮：${ctx.port ? `${esc(ctx.port.name)}の港（${ctx.port.km.toFixed(0)}km）` : "—"}　${NAMES.jma}：${ctx.jma ? esc(ctx.jma.name) : "—"}</p>`;
+    <div class="summary-head"><strong>${esc(state.place.alts ? baseName(state.place.name) : state.place.name)}${(state.place.coords || state.place.alts) && ctx.jma ? `（${esc(ctx.jma.muniName)}）` : ""}</strong><span class="sub">${day.short} ${h}時${ctx.jma ? "" : "（日本時間）"}</span></div>
+    <p class="where">潮：${ctx.port ? `${esc(ctx.port.name)}の港（${ctx.port.km.toFixed(0)}km）` : "—"}　${NAMES.jma}：${ctx.jma ? esc(ctx.jma.name) : "—"}</p>
+    ${state.place.alts ? `<details class="alts"${altsOpen ? " open" : ""}><summary>ほかにも「${esc(baseName(state.place.name))}」があります（${state.place.alts.length}か所）</summary>
+      <ul>${state.place.alts.map((a, i) => `<li><button type="button" data-alt="${i}"><span>${esc(a.label)}</span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></button></li>`).join("")}</ul></details>` : ""}`;
   document.getElementById("summary").innerHTML = `
     <div class="minis">
       <a class="mini" href="#sec-wave"><span class="mini-title">${waveIcon}波 m<span class="go ls-icon" data-icon="next" aria-hidden="true"></span></span><div id="mini-wave"></div></a>
@@ -277,6 +279,19 @@ function remember(place) {
   store.set("umiqru:recent", list.slice(0, 6));
   drawRecent();
 }
+// 同じ名前のほかの場所（開け閉めの欄から選ぶ）。選んだあとも、もとの場所を候補に残す
+const baseName = name => name.replace(/（.+）$/, "");
+let altsOpen = false;
+const placeInfo = document.getElementById("place-info");
+placeInfo.addEventListener("toggle", ev => { if (ev.target.matches("details.alts")) altsOpen = ev.target.open; }, true);
+placeInfo.addEventListener("click", ev => {
+  const b = ev.target.closest("[data-alt]");
+  const cur = state.place, a = b && cur?.alts?.[Number(b.dataset.alt)];
+  if (!a) return;
+  altsOpen = false;
+  const { alts, ...me } = cur;
+  go({ ...a, alts: [me, ...alts.filter(x => x !== a)] });
+});
 function drawRecent() {
   const list = store.get("umiqru:recent") || [];
   const el = document.getElementById("recent");
@@ -292,7 +307,10 @@ const loadScript = () => scriptText ? Promise.resolve(scriptText) : fetch(SCRIPT
 function placeParam() {
   const p = state.place;
   if (!p) return "城ヶ島";
-  return p.coords || p.name === "今いる場所" ? `${p.lat.toFixed(4)},${p.lon.toFixed(4)}` : p.name;
+  if (p.coords || p.name === "今いる場所") return `${p.lat.toFixed(4)},${p.lon.toFixed(4)}`;
+  // 同じ名前の場所がほかにもあるときは、選んだ位置を名前つきで渡す（ウィジェットが別の場所を選ばないように）
+  if (p.alts || /（.+）$/.test(p.name)) return `${p.lat.toFixed(4)},${p.lon.toFixed(4)}=${baseName(p.name)}`;
+  return p.name;
 }
 async function copyText(get, btn) {
   const label = btn.innerHTML;

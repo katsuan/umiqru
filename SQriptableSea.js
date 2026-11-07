@@ -8,7 +8,7 @@
 // 新しい版が出ると通知で知らせます。入れかえ方は https://katsuan.github.io/umiqru/#howto
 // ======================================
 
-const SEA_BUILD = "ad5badcfd5";
+const SEA_BUILD = "9293e9bb07";
 
 const PALETTE = {
   brand: "#6C47FF",
@@ -933,7 +933,7 @@ async function seaPlace(arg) {
   const port = text && seaPorts().find((p) => p.name === text);
   if (port) return { lat: port.lat, lon: port.lon, name: port.name };
   if (!text || /^(-?\d+(?:\.\d+)?)[,_](-?\d+(?:\.\d+)?)(?:=(.+))?$/.test(text)) return resolvePlace(text);
-  const key = "sea_place_" + encodeURIComponent(text);
+  const key = "sea_place2_" + encodeURIComponent(text);
   const cached = readCache(key);
   if (cached) return cached;
   const search = async (name) => {
@@ -943,13 +943,27 @@ async function seaPlace(arg) {
       return [];
     }
   };
+  const gsiP = request(`https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(text)}`).loadJSON().catch(() => []);
   let found = (await Promise.all([text, text + "市"].map(search))).flat();
   if (!found.length) found = await search(text + "町");
-  if (!found.length) return resolvePlace(text);
-  const near = (r) => seaPorts().some((p) => seaKm({ lat: r.latitude, lon: r.longitude }, p) <= SEA.portMaxKm);
-  const score = (r) => (r.country_code === "JP" ? 2 : 0) + (near(r) ? 1 : 0);
-  const best = found.sort((a, b) => score(b) - score(a) || (b.population || 0) - (a.population || 0))[0];
-  const place = { lat: best.latitude, lon: best.longitude, name: text };
+  const gsi = ((await gsiP) || []).map((f) => ({ title: (f.properties && f.properties.title) || "", code: f.properties && f.properties.addressCode, ds: f.properties && f.properties.dataSource, lon: f.geometry && f.geometry.coordinates && f.geometry.coordinates[0], lat: f.geometry && f.geometry.coordinates && f.geometry.coordinates[1] }))
+    .filter((g) => Number.isFinite(g.lat) && Number.isFinite(g.lon));
+  const list = [];
+  const add = (c) => {
+    const same = list.find((x) => seaKm(x, c) <= 5);
+    if (!same) list.push(c);
+    else { same.pop = Math.max(same.pop, c.pop); same.jp = same.jp || c.jp; }
+  };
+  found.forEach((r) => add({ lat: r.latitude, lon: r.longitude, pop: r.population || 0, jp: r.country_code === "JP" }));
+  const addGsi = (ds) => gsi.filter((g) => g.code && g.ds === ds && g.title === text).forEach((g) => add({ lat: g.lat, lon: g.lon, pop: 0, jp: true }));
+  addGsi("4");
+  if (!list.length) addGsi("5");
+  if (!list.length) return resolvePlace(text);
+  list.forEach((c, i) => { c.i = i; c.towns = gsi.filter((g) => g.ds === "5" && g.title.endsWith(text) && seaKm(c, g) <= 5).length; });
+  const near = (c) => seaPorts().some((p) => seaKm(c, p) <= SEA.portMaxKm);
+  const score = (c) => (c.jp ? 2 : 0) + (near(c) ? 1 : 0);
+  const best = list.sort((a, b) => score(b) - score(a) || b.pop - a.pop || b.towns - a.towns || a.i - b.i)[0];
+  const place = { lat: best.lat, lon: best.lon, name: text };
   writeCache(key, place);
   return place;
 }

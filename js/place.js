@@ -26,24 +26,70 @@ export async function findPlace(text) {
   const ports = await loadPorts();
   const exact = ports.find(p => p.name === text);
   if (exact) return { name: exact.name, lat: exact.lat, lon: exact.lon };
-  // 「○○」と「○○市」をいっしょにさがす（なければ「○○町」も）。候補は、日本・近くに潮の港（30km 以内）がある・人の多い の順に選ぶ
-  const search = async name => {
-    try {
-      const j = await getJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=10&language=ja&format=json`);
-      return j.results || [];
-    } catch { return []; }
-  };
-  let found = (await Promise.all([text, text + "市"].map(search))).flat();
-  if (!found.length) found = await search(text + "町");
-  if (found.length) {
-    const near = r => ports.some(p => km({ lat: r.latitude, lon: r.longitude }, p) <= PORT_MAX_KM);
-    const score = r => (r.country_code === "JP" ? 2 : 0) + (near(r) ? 1 : 0);
-    const best = found.sort((a, b) => score(b) - score(a) || (b.population || 0) - (a.population || 0))[0];
-    return { name: text, lat: best.latitude, lon: best.longitude };
+  // 「鵜来島（宿毛市）」のように地域を添えたら、その地域の候補を選ぶ（「ほかの○○」から選んだとき）
+  const hm = text.match(/^(.+?)（(.+)）$/);
+  const base = hm ? hm[1] : text, hint = hm ? hm[2] : "";
+  const cands = await placeCandidates(base, ports);
+  if (cands.length) {
+    const pick = (hint && (cands.find(c => c.short === hint) || cands.find(c => c.label.includes(hint)))) || cands[0];
+    // 候補ひとつずつの場所（いちばん上は名前だけ、ほかは地域を添える）。選んだもの以外を「ほかの候補」にする
+    const asPlace = c => ({ name: c === cands[0] ? base : `${base}（${c.short}）`, label: c.label, lat: c.lat, lon: c.lon });
+    const all = cands.slice(0, 6).map(asPlace);
+    const me = asPlace(pick);
+    const alts = all.filter(a => a.name !== me.name);
+    return alts.length ? { ...me, alts } : { name: me.name, lat: me.lat, lon: me.lon };
   }
   const part = ports.find(p => p.name.includes(text) || text.includes(p.name));
   if (part) return { name: part.name, lat: part.lat, lon: part.lon };
   throw new Error(`「${text}」が見つかりませんでした`);
+}
+
+// 同じ名前の場所の候補（よさそうな順）。Open-Meteo の地名と、国土地理院の地名さがし（小さな島や字も載っている）の両方から。
+// 5km 以内はひとつにまとめ、日本・近くに潮の港（30km 以内）・人の多さ・国土地理院の町や字の名前に載っている（人の住む所） の順に選ぶ。
+// SQriptable の sea カード（seaPlace）も同じ決め方
+async function placeCandidates(text, ports) {
+  const om = async name => {
+    try { return (await getJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=10&language=ja&format=json`)).results || []; } catch { return []; }
+  };
+  const gsiP = getJSON(`https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(text)}`).catch(() => []);
+  let found = (await Promise.all([text, text + "市"].map(om))).flat();
+  if (!found.length) found = await om(text + "町");
+  const gsi = (await gsiP || []).map(f => ({ title: f.properties?.title || "", code: f.properties?.addressCode, ds: f.properties?.dataSource, lon: f.geometry?.coordinates?.[0], lat: f.geometry?.coordinates?.[1] }))
+    .filter(g => Number.isFinite(g.lat) && Number.isFinite(g.lon));
+  const area = await loadArea().catch(() => null);
+  const muniLabel = code => {
+    const key = code && area && c20Key(area, code);
+    const c20 = key && area.class20s[key];
+    if (!c20) return null;
+    const c10 = area.class15s[c20.parent]?.parent, office = area.class10s[c10]?.parent;
+    return { label: `${area.offices[office]?.name || ""} ${c20.name}`.trim(), short: c20.name };
+  };
+  const list = [];
+  const add = (c) => {
+    const same = list.find(x => km(x, c) <= 5);
+    if (!same) { list.push(c); return; }
+    same.pop = Math.max(same.pop, c.pop); same.jp ||= c.jp;
+    if (!same.code && c.code) { same.code = c.code; same.label = c.label; same.short = c.short; }
+  };
+  found.forEach(r => add({ lat: r.latitude, lon: r.longitude, pop: r.population || 0, jp: r.country_code === "JP", label: [r.admin1, r.admin2].filter(Boolean).join(" ") || r.country || "", short: r.admin2 || r.admin1 || r.country || "" }));
+  // 国土地理院の地名（島・岬など。dataSource 4）で、名前がそのままのもの。町や字（5）は全国に同じ名前が多いので、
+  // ほかに何もないときだけ候補にする
+  const addGsi = ds => gsi.filter(g => g.code && g.ds === ds && g.title === text)
+    .forEach(g => { const m = muniLabel(g.code); if (m) add({ lat: g.lat, lon: g.lon, pop: 0, jp: true, code: g.code, ...m }); });
+  addGsi("4");
+  if (!list.length) addGsi("5");
+  // 国土地理院の町や字の名前に載っている数（「沖の島町鵜来島」など。人の住む所ほど多い）
+  list.forEach(c => { c.towns = gsi.filter(g => g.ds === "5" && g.title.endsWith(text) && km(c, g) <= 5).length; });
+  const near = c => ports.some(p => km(c, p) <= PORT_MAX_KM);
+  const score = c => (c.jp ? 2 : 0) + (near(c) ? 1 : 0);
+  return list.map((c, i) => ({ ...c, i })).sort((a, b) => score(b) - score(a) || b.pop - a.pop || b.towns - a.towns || a.i - b.i);
+}
+
+// 国土地理院の市区町村コード → 気象庁の市町村の区分（政令市の区は市の番号で載っていることがある）
+function c20Key(area, code) {
+  const m = String(code).padStart(5, "0");
+  const keys = Object.keys(area.class20s);
+  return area.class20s[m + "00"] ? m + "00" : keys.find(k => k.startsWith(m)) || keys.find(k => k.startsWith(m.slice(0, 4) + "0")) || null;
 }
 
 // 近い潮の港と、気象庁の地域（国土地理院の市区町村コード → 気象庁の区分）
@@ -74,10 +120,7 @@ export async function placeContext(place) {
   if (muni) store.set(cacheKey, muni);
   let jma = null;
   if (muni) {
-    const m = String(muni).padStart(5, "0");
-    const keys = Object.keys(area.class20s);
-    const c20 = area.class20s[m + "00"] ? m + "00"
-      : keys.find(k => k.startsWith(m)) || keys.find(k => k.startsWith(m.slice(0, 4) + "0"));
+    const c20 = c20Key(area, muni);
     if (c20) {
       const c10 = area.class15s[area.class20s[c20].parent]?.parent;
       const office = area.class10s[c10]?.parent;
