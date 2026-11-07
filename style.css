@@ -212,7 +212,7 @@ details.models li b { white-space: nowrap; color: var(--text); }
 section[id^="sec-"], #tabs, #place-info { scroll-margin-top: 8px; }
 /* タブの帯は上に残るので、欄の中の段へ送るときは帯の高さぶんあける */
 #waves { scroll-margin-top: 112px; }
-/* まとめ：風・波・潮（天気も）のまとまり（グラフ → 数字のカード）。上から1つずつ。広い画面では、左にグラフ・右に数字（4枚のまとまりは半分ずつで 2×2） */
+/* まとめ：潮（天気も）・波・風のまとまり（グラフ → 数字のカード）。上から1つずつ。広い画面では、左にグラフ・右に数字（4枚のまとまりは半分ずつで 2×2） */
 .sum-groups { display: grid; gap: 24px; }
 .sum-group { display: grid; gap: 8px; align-content: start; min-width: 0; }
 @media (min-width: 640px) {

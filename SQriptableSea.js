@@ -8,7 +8,7 @@
 // 新しい版が出ると通知で知らせます。入れかえ方は https://katsuan.github.io/umiqru/#howto
 // ======================================
 
-const SEA_BUILD = "0ed24c24e9";
+const SEA_BUILD = "b5c6e97694";
 
 const PALETTE = {
   brand: "#6C47FF",
@@ -1523,7 +1523,7 @@ defineCard("sea", {
       }
     };
     const chosen = d.opt && d.opt.show && d.opt.show.length ? d.opt.show : null;
-    const auto = (big ? ["wave", "tide", "wind"] : wide ? ["wave", "tide"] : ["wave"]).filter((g) => g !== "tide" || d.tide.length || !wide);
+    const auto = (big ? ["tide", "wave", "wind"] : wide ? ["tide", "wave"] : ["wave"]).filter((g) => g !== "tide" || d.tide.length || !wide);
     const items = chosen || auto;
     box.addSpacer(4);
     if (room < legendH + 16) {
@@ -1597,11 +1597,11 @@ async function seaMenu() {
   const place = ask.textFieldValue(0).replace(/[（(）)]/g, "").replace(/[，、]/g, ",").replace(/\s*,\s*/g, ",").trim().replace(/\s+/g, "_");
   const sets = [
     ["おまかせ（大きさに合わせる）", []],
-    ["波と潮", ["wave", "tide"]],
+    ["潮と波", ["tide", "wave"]],
     ["風のグラフだけ", ["wind"]],
     ["波と風", ["wave", "wind"]],
     ["潮と風", ["tide", "wind"]],
-    ["波・潮・風", ["wave", "tide", "wind"]],
+    ["潮・波・風", ["tide", "wave", "wind"]],
   ];
   const pick = new Alert();
   pick.title = "出すもの";

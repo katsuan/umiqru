@@ -55,14 +55,21 @@
   <!-- まとめ（ウィジェットと同じ見え方）とくわしい欄を1つずつ。まとめの項目を押すと、その欄に切りかわる -->
   <div class="ls-tabs" id="tabs" role="tablist" aria-label="見るもの">
     <button type="button" class="ls-tab" role="tab" id="tab-summary" data-tab="summary" aria-controls="summary">まとめ</button>
-    <button type="button" class="ls-tab" role="tab" id="tab-wave" data-tab="wave" aria-controls="sec-wave">波</button>
     <button type="button" class="ls-tab" role="tab" id="tab-tide" data-tab="tide" aria-controls="sec-tide">潮</button>
+    <button type="button" class="ls-tab" role="tab" id="tab-wave" data-tab="wave" aria-controls="sec-wave">波</button>
     <button type="button" class="ls-tab" role="tab" id="tab-wind" data-tab="wind" aria-controls="sec-wind">風</button>
     <button type="button" class="ls-tab" role="tab" id="tab-weather" data-tab="weather" aria-controls="sec-weather">天気</button>
   </div>
 
   <section class="card" id="summary" role="tabpanel" aria-labelledby="tab-summary"></section>
 
+
+  <section class="card" id="sec-tide" role="tabpanel" aria-labelledby="tab-tide">
+    <h2><span class="ls-icon is-text" data-icon="moon" aria-hidden="true"></span>潮の満ち引き</h2>
+    <ul class="legend" id="tide-legend"></ul>
+    <div class="chart" id="tide-chart"></div>
+    <div class="tides" id="tide-list"></div>
+  </section>
 
   <section class="card" id="sec-wave" role="tabpanel" aria-labelledby="tab-wave">
     <div class="sec-head">
@@ -81,13 +88,6 @@
     <div id="wave-tl"></div>
     <h3 class="small sub" style="margin:16px 0 8px;font-weight:700">気象庁の波の予報（3日先まで）</h3>
     <div id="waves"></div>
-  </section>
-
-  <section class="card" id="sec-tide" role="tabpanel" aria-labelledby="tab-tide">
-    <h2><span class="ls-icon is-text" data-icon="moon" aria-hidden="true"></span>潮の満ち引き</h2>
-    <ul class="legend" id="tide-legend"></ul>
-    <div class="chart" id="tide-chart"></div>
-    <div class="tides" id="tide-list"></div>
   </section>
 
   <section class="card" id="sec-wind" role="tabpanel" aria-labelledby="tab-wind">
