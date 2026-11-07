@@ -23,6 +23,9 @@ export async function findPlace(text) {
   const plain = text.replace(/[（(）)\[\]]/g, "").replace(/[，、]/g, ",").replace(/[０-９．－]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0)).trim();
   const ll = plain.match(/^(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)$/);
   if (ll) return { name: `${(+ll[1]).toFixed(4)}, ${(+ll[2]).toFixed(4)}`, lat: +ll[1], lon: +ll[2], coords: true };
+  // 「32.8027,132.4898=鵜来島」… 位置と名前（同じ名前の場所がほかにもあるときの共有リンク・ウィジェットの Parameter と同じ形）
+  const named = text.match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*=\s*(.+)$/);
+  if (named) return { name: named[3].trim(), lat: +named[1], lon: +named[2], pinned: true };
   const ports = await loadPorts();
   const exact = ports.find(p => p.name === text);
   if (exact) return { name: exact.name, lat: exact.lat, lon: exact.lon };

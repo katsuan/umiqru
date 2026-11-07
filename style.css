@@ -90,6 +90,8 @@
   .where { font-size: 13px; color: var(--text-3); margin: 0; }
   .place-info { margin: 0 0 16px; }
   .place-info:empty { margin: 0; }
+  .share-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+  .share-row .ls-button { min-width: 0; white-space: nowrap; padding-inline: 8px; font-size: 15px; }
   details.alts { margin-top: 8px; font-size: 13px; }
   details.alts summary { cursor: pointer; color: var(--text-2); }
   details.alts ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
