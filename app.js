@@ -396,7 +396,7 @@ function drawHowto() {
       <tr><td><code class="param">20.4253,136.0814</code></td><td class="wrap">緯度・経度で（日本の外も）</td></tr>
       <tr><td><span class="muted">（空）</span></td><td class="wrap">今いる場所</td></tr>
       <tr><td><code class="param">城ヶ島,wave,wind</code></td><td class="wrap">書いたものだけを書いた順に（wave 波・tide 潮・wind 風）</td></tr>
-      <tr><td><code class="param">城ヶ島,wind,deg</code></td><td class="wrap">風の表だけ・向きを角度で</td></tr>
+      <tr><td><code class="param">城ヶ島,wind,deg</code></td><td class="wrap">風のグラフだけ・向きを角度で</td></tr>
     </tbody>`;
   document.getElementById("howto-note").textContent = `ウィジェットは iOS の都合で15分〜1時間ごとに描き直されます。Parameter の「,」や「:」が消えてしまうときは、${S} の中で「${W}」を一度開いて、出てくるメニューで作った Parameter を貼ってください。`;
   document.getElementById("copy-script").onclick = ev => copyText(loadScript, ev.currentTarget);

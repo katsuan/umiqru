@@ -8,7 +8,7 @@
 // 新しい版が出ると通知で知らせます。入れかえ方は https://katsuan.github.io/umiqru/#howto
 // ======================================
 
-const SEA_BUILD = "9293e9bb07";
+const SEA_BUILD = "0ed24c24e9";
 
 const PALETTE = {
   brand: "#6C47FF",
@@ -1264,8 +1264,8 @@ function seaGraph(w, h, { series, from, i, theme, refs = [], bands = [], marks =
       xy.slice(1).forEach(([x, y]) => path.addLine(new Point(x, y)));
     }
     dc.addPath(path);
-    dc.setStrokeColor(paint.line(series[k].color));
-    dc.setLineWidth(series.length > 1 ? 1.5 : 2);
+    dc.setStrokeColor(series[k].color ? paint.line(series[k].color) : paint.ref);
+    dc.setLineWidth(series[k].thin ? 1 : series.length > 1 ? 1.5 : 2);
     dc.strokePath();
   });
   marks.forEach((mk) => {
@@ -1335,53 +1335,51 @@ function seaTideGraph(box, d, ctx, view, w, h) {
   seaPlot(box, seaGraph(w, h, { series: tide, from: view.from, i: view.i, theme: ctx.theme, bands, marks: d.tideMarks, floor0: false }), w, h);
 }
 
-function seaWindTableH(d, rowH = 24) {
-  return 12 + d.winds.filter((m) => m.v.some((v) => v != null)).length * rowH;
+const SEA_ARROW_H = 14;
+
+function seaMeanDir(winds, k) {
+  const list = winds.map((m) => ({ sp: m.v[k], dir: m.dir && m.dir[k] })).filter((x) => x.sp != null && x.dir != null);
+  if (!list.length) return null;
+  const r = Math.PI / 180;
+  const x = list.reduce((a, m) => a + m.sp * Math.sin(m.dir * r), 0) / list.length;
+  const y = list.reduce((a, m) => a + m.sp * Math.cos(m.dir * r), 0) / list.length;
+  const mean = ((Math.atan2(x, y) / r) % 360 + 360) % 360;
+  const spread = Math.max(...list.map((m) => Math.abs((((m.dir - mean) % 360) + 540) % 360 - 180)));
+  return { deg: mean, spread, calm: Math.hypot(x, y) < 0.5 };
 }
 
-function seaWindTable(box, d, ctx, w, rowH = 24) {
-  const { theme } = ctx;
-  const i = seaHourIndex(d, ctx.now);
-  const list = d.winds.filter((m) => m.v.some((v) => v != null));
-  const big = rowH >= 34;
-  const thin = rowH < 22;
-  const labelW = big ? 52 : thin ? 36 : 46;
-  const cols = Math.max(1, Math.min(8, Math.floor((w - labelW) / (thin ? 46 : 34)), Math.floor((47 - i) / 3) + 1));
-  const cw = Math.floor((w - labelW) / cols);
-  const at = (c) => i + c * 3;
-  const head = hrow(box, 0);
-  const lab = head.addStack();
-  lab.size = new Size(labelW, 12);
-  txt(lab, "風 m/s", 8, theme.sub, "semibold", { scale: 0.6 });
-  lab.addSpacer();
-  for (let c = 0; c < cols; c++) fixedTxt(head, cw, `${at(c) % 24}時`, big ? 10 : 8, c ? theme.sub : theme.text, "semibold");
-  list.forEach((m) => {
-    const row = hrow(box, 0);
-    const name = row.addStack();
-    name.size = new Size(labelW, rowH);
-    name.centerAlignContent();
-    name.spacing = 3;
-    const dot = canvas(6, 6);
-    dot.setFillColor(seaPaint(theme).line(m.color));
-    dot.fillEllipse(new Rect(0, 0, 6, 6));
-    const v = name.addImage(dot.getImage());
-    v.imageSize = new Size(6, 6);
-    txt(name, m.label, big ? 11 : thin ? 8 : 9, theme.sub, "semibold", { scale: 0.7 });
-    name.addSpacer();
-    for (let c = 0; c < cols; c++) {
-      const k = at(c);
-      const sp = m.v[k];
-      if (thin) {
-        fixedTxt(row, cw, sp == null ? "—" : `${seaDirText(d, m.dir && m.dir[k])} ${sp >= 10 ? Math.round(sp) : sp.toFixed(1)}`, 8, c ? theme.sub : theme.text, c ? "medium" : "bold");
-        continue;
-      }
-      const cell = row.addStack();
-      cell.layoutVertically();
-      cell.size = new Size(cw, rowH);
-      fixedTxt(cell, cw, sp == null ? "" : seaDirText(d, m.dir && m.dir[k]), big ? 9 : 7, theme.sub, "medium", { scale: 0.6 });
-      fixedTxt(cell, cw, sp == null ? "—" : sp >= 10 ? String(Math.round(sp)) : sp.toFixed(1), big ? 14 : 10, c ? theme.sub : theme.text, c ? "medium" : "bold");
+function seaWindArrows(box, d, ctx, view, w) {
+  const h = SEA_ARROW_H;
+  const dc = canvas(w, h);
+  const paint = seaPaint(ctx.theme);
+  const r = Math.PI / 180;
+  for (let t = Math.ceil(view.from / 3) * 3; t <= view.from + 24; t += 3) {
+    const m = seaMeanDir(d.winds, t);
+    if (!m) continue;
+    const cx = Math.max(h / 2, Math.min(w - h / 2, ((t - view.from) / 24) * w));
+    const cy = h / 2;
+    const color = m.spread > 45 || m.calm ? paint.base : paint.now;
+    if (m.calm) {
+      dc.setFillColor(color);
+      dc.fillEllipse(new Rect(cx - 1.5, cy - 1.5, 3, 3));
+      continue;
     }
-  });
+    const c = Math.cos(m.deg * r);
+    const sn = Math.sin(m.deg * r);
+    const P = (x, y) => new Point(cx + x * c - y * sn, cy + x * sn + y * c);
+    const L = h / 2 - 1.5;
+    const path = new Path();
+    path.move(P(0, -L));
+    path.addLine(P(0, L));
+    path.move(P(-3.5, L - 3.5));
+    path.addLine(P(0, L));
+    path.addLine(P(3.5, L - 3.5));
+    dc.addPath(path);
+    dc.setStrokeColor(color);
+    dc.setLineWidth(1.5);
+    dc.strokePath();
+  }
+  seaPlot(box, dc.getImage(), w, h);
 }
 
 defineCard("sea", {
@@ -1395,7 +1393,9 @@ defineCard("sea", {
     return new Date(ctx.now.getFullYear(), ctx.now.getMonth(), ctx.now.getDate(), ctx.now.getHours() + 1, 1);
   },
   url(d) {
-    return d ? `${SEA.page}?q=${d.lat.toFixed(4)},${d.lon.toFixed(4)}` : SEA.page;
+    if (!d) return SEA.page;
+    const at = `${d.lat.toFixed(4)},${d.lon.toFixed(4)}`;
+    return `${SEA.page}?q=${encodeURIComponent(d.name && !/^-?\d/.test(d.name) ? `${at}=${d.name}` : at)}`;
   },
   inline(d, ctx) {
     const i = seaHourIndex(d, ctx.now);
@@ -1505,13 +1505,8 @@ defineCard("sea", {
       const full = d.tideRange != null ? `${tideBase}・${SEA.tideRangeText(d.tideRange)}` : tideBase;
       return textWidth(full, 9) * 1.15 + 8 <= cw ? full : tideBase;
     };
-    const windRows = d.winds.filter((m) => m.v.some((v) => v != null)).length || 1;
-    let tableRowH = 24;
-    const fitRowH = (avail, grow) => {
-      const r = Math.floor((avail - 12) / windRows);
-      return r >= 24 ? (grow ? Math.min(48, r) : 24) : r >= 13 ? 13 : 0;
-    };
-    const isTable = (g, cw) => g === "wind" && cw >= 150 && tableRowH > 0;
+    const gustLine = (d.gust || []).some((v) => v != null) ? [{ label: "突風", dash: true, thin: true, v: d.gust }] : [];
+    const extra = (g) => (g === "wind" ? SEA_ARROW_H + 2 : 0);
     const drawOne = (col, g, cw, gh) => {
       if (g === "wave") {
         seaLegend(col, "波 m", waveItems, 9, theme, cw);
@@ -1520,12 +1515,11 @@ defineCard("sea", {
         seaLegend(col, tideTitle(cw), [], 9, theme, cw);
         if (d.tide.length) seaTideGraph(col, d, ctx, view, cw, gh);
         else txt(col, `${SEA.names.tide}は日本の港だけ`, 9, theme.sub, "medium");
-      } else if (isTable(g, cw)) {
-        seaWindTable(col, d, ctx, cw, tableRowH);
-        col.addSpacer();
       } else {
-        seaLegend(col, "風 m/s", d.winds, 9, theme, cw);
-        seaPlot(col, seaGraph(cw, gh, { series: d.winds, from: view.from, i, theme, bands: seaNightBands(d) }), cw, gh);
+        seaLegend(col, "風 m/s", [...d.winds.filter((m) => m.v.some((v) => v != null)), ...gustLine], 9, theme, cw);
+        seaPlot(col, seaGraph(cw, gh - extra(g), { series: [...d.winds, ...gustLine], from: view.from, i, theme, bands: seaNightBands(d) }), cw, gh - extra(g));
+        col.addSpacer(2);
+        seaWindArrows(col, d, ctx, view, cw);
       }
     };
     const chosen = d.opt && d.opt.show && d.opt.show.length ? d.opt.show : null;
@@ -1535,8 +1529,7 @@ defineCard("sea", {
     if (room < legendH + 16) {
     } else if (wide && !big && items.length >= 2) {
       const cw = Math.floor((w - 12) / 2);
-      const gh = Math.max(16, room - legendH - 2);
-      tableRowH = fitRowH(room + axisH, false);
+      const gh = Math.max(16 + SEA_ARROW_H + 2, room - legendH - 2);
       const row = box.addStack();
       row.layoutHorizontally();
       row.spacing = 12;
@@ -1545,31 +1538,24 @@ defineCard("sea", {
         col.layoutVertically();
         col.size = new Size(cw, 0);
         drawOne(col, g, cw, gh);
-        if (!isTable(g, cw)) {
-          col.addSpacer(2);
-          hourAxis(col, view.axis, cw, 8, theme);
-        }
+        col.addSpacer(2);
+        hourAxis(col, view.axis, cw, 8, theme);
       });
     } else {
-      const graphCount = items.filter((g) => g !== "wind").length;
-      tableRowH = fitRowH(room + axisH - graphCount * (legendH + 26) - (graphCount ? 6 : 0), graphCount === 0);
       const shown = [];
       let need = 0;
       for (const g of items) {
-        const n = isTable(g, w) ? seaWindTableH(d, tableRowH) + 6 : legendH + 26;
+        const n = legendH + 26 + extra(g);
         if (shown.length && need + n > room + axisH) break;
         shown.push(g);
         need += n;
       }
-      const graphs = shown.filter((g) => !isTable(g, w)).length;
-      const fixed = shown.some((g) => isTable(g, w)) ? seaWindTableH(d, tableRowH) + 6 : 0;
-      const gh = graphs ? Math.max(16, Math.floor((room - fixed) / graphs - legendH - 2)) : 0;
-      const lastGraph = shown.map((g) => !isTable(g, w)).lastIndexOf(true);
+      const fixed = shown.reduce((a, g) => a + extra(g), 0);
+      const gh = Math.max(16, Math.floor((room - fixed) / shown.length - legendH - 2));
       shown.forEach((g, k) => {
-        if (isTable(g, w) && k) box.addSpacer(6);
-        drawOne(box, g, w, gh);
+        drawOne(box, g, w, gh + extra(g));
         box.addSpacer(2);
-        if (k === lastGraph) hourAxis(box, view.axis, w, 8, theme);
+        if (k === shown.length - 1) hourAxis(box, view.axis, w, 8, theme);
       });
     }
     box.addSpacer();
@@ -1612,7 +1598,7 @@ async function seaMenu() {
   const sets = [
     ["おまかせ（大きさに合わせる）", []],
     ["波と潮", ["wave", "tide"]],
-    ["風の表だけ", ["wind"]],
+    ["風のグラフだけ", ["wind"]],
     ["波と風", ["wave", "wind"]],
     ["潮と風", ["tide", "wind"]],
     ["波・潮・風", ["wave", "tide", "wind"]],
