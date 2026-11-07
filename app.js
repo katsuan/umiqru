@@ -215,6 +215,7 @@ function render() {
   const sst = sliceDay(d.sea?.hourly?.sea_surface_temperature, state.day)[h];
   const waveIcon = `<span class="ls-icon is-text" data-icon="waves" aria-hidden="true"></span>`;
   const moonIcon = `<span class="ls-icon is-text" data-icon="moon" aria-hidden="true"></span>`;
+  const windIcon = `<span class="ls-icon is-text" data-icon="wind" aria-hidden="true"></span>`;
   document.getElementById("place-info").innerHTML = `
     <div class="summary-head"><strong>${esc(state.place.alts ? baseName(state.place.name) : state.place.name)}${(state.place.coords || state.place.alts || state.place.pinned) && ctx.jma ? `（${esc(ctx.jma.muniName)}）` : ""}</strong><span class="sub">${day.short} ${h}時${ctx.jma ? "" : "（日本時間）"}</span></div>
     <p class="where">潮：${ctx.port ? `${esc(ctx.port.name)}の港（${ctx.port.km.toFixed(0)}km）` : "—"}　${NAMES.jma}：${ctx.jma ? esc(ctx.jma.name) : "—"}</p>
@@ -225,18 +226,32 @@ function render() {
   shareBox.innerHTML = `<h2 class="share-title">${esc(baseName(state.place.name))}の海を送る</h2>
     <div class="share-row">${window.OQRN ? `<a class="ls-button line is-oqrn" id="send-card" href="#">カードでおくるん</a>` : ""}<button type="button" class="ls-button" id="share-link"><span class="ls-icon is-text" data-icon="${navigator.share ? "share" : "link"}" aria-hidden="true"></span>${navigator.share ? "リンクを共有" : "リンクをコピー"}</button></div>
     <p class="muted small share-note">カードには ${day.short} ${h}時のめやす（波・風・潮・天気・水温）が入り、カードのボタンからこの場所の${NAMES.app}が開きます。</p>`;
+  // ウィジェット（Parameter なし）と同じ 波 → 潮 → 風 の順に、グラフ → 数字のカード
   document.getElementById("summary").innerHTML = `
-    <div class="minis">
-      <a class="mini" href="#sec-wave"><span class="mini-title">${waveIcon}波 m<span class="go ls-icon" data-icon="next" aria-hidden="true"></span></span><div id="mini-wave"></div></a>
-      <a class="mini" href="#sec-tide"><span class="mini-title">${moonIcon}潮${tide ? ` ${esc(tide.moon.title)}` : ""}<span class="go ls-icon" data-icon="next" aria-hidden="true"></span></span><div id="mini-tide"></div></a>
+    <div class="sum-groups">
+    <div class="sum-group">
+        <a class="mini" href="#sec-wave"><span class="mini-title">${waveIcon}波 m<span class="go ls-icon" data-icon="next" aria-hidden="true"></span></span><div id="mini-wave"></div></a>
+      <div class="facts">
+        <a class="fact" href="#sec-wave"><span class="dt"><span class="ls-icon is-text" data-icon="waves" aria-hidden="true"></span>波（4つの予報）</span><span class="dd">${wr ? spread(wr) : "—"}<span class="unit">m</span><span class="note">${wr && wr.n > 1 ? `いちばん大きい差 ${fmt(wr.hi - wr.lo)} m` : ""}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
+        <a class="fact" href="#waves"><span class="dt"><span class="ls-icon is-text" data-icon="waves" aria-hidden="true"></span>波（${NAMES.jma}）</span><span class="dd">${waveTop == null ? "—" : fmt(waveTop)}<span class="unit">${waveTop == null ? "" : "m まで"}</span><span class="note">${text?.wave ? esc(text.wave) : (!ctx.jma ? "日本だけ" : state.day > 2 ? "3日先まで" : "")}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
+      </div>
     </div>
-    <div class="facts">
-      <a class="fact" href="#sec-wave"><span class="dt"><span class="ls-icon is-text" data-icon="waves" aria-hidden="true"></span>波（4つの予報）</span><span class="dd">${wr ? spread(wr) : "—"}<span class="unit">m</span><span class="note">${wr && wr.n > 1 ? `いちばん大きい差 ${fmt(wr.hi - wr.lo)} m` : ""}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
-      <a class="fact" href="#waves"><span class="dt"><span class="ls-icon is-text" data-icon="waves" aria-hidden="true"></span>波（${NAMES.jma}）</span><span class="dd">${waveTop == null ? "—" : fmt(waveTop)}<span class="unit">${waveTop == null ? "" : "m まで"}</span><span class="note">${text?.wave ? esc(text.wave) : (!ctx.jma ? "日本だけ" : state.day > 2 ? "3日先まで" : "")}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
-      <a class="fact" href="#sec-wind"><span class="dt"><span class="ls-icon is-text" data-icon="wind" aria-hidden="true"></span>風（${wind.filter(s => valueAt(s, h) != null).length}つの予報）</span><span class="dd">${r ? spread(r) : "—"}<span class="unit">m/s</span><span class="note">${windDir != null ? (state.windDir === "deg" ? `向き ${windDirText(windDir)}` : `${dirName(windDir)}の風`) : ""}${gustMax != null ? `<br>突風 ${fmt(gustMax, 0)} m/s まで` : ""}${amedas?.wind != null ? `<br>実況 ${fmt(amedas.wind)} m/s（${esc(amedas.name)} ${esc(amedas.time)}）` : ""}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
-      <a class="fact" href="#sec-tide"><span class="dt"><span class="ls-icon is-text" data-icon="moon" aria-hidden="true"></span>潮</span><span class="dd">${tide ? esc(tide.moon.title) : "—"}<span class="note">${!tide ? (tideWaiting(day.ymd) ? "読みこみ中…" : ctx.port ? "読めませんでした" : "日本の港だけ") : nextTide ? `${tideDiff ? `${tideDiff}<br>` : ""}つぎ ${nextTide.when || ""}${nextTide.k} ${esc(nextTide.time)}` : "満潮・干潮の時刻を読めませんでした"}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
-      <a class="fact" href="#sec-tide"><span class="dt"><span class="ls-icon is-text" data-icon="sunrise" aria-hidden="true"></span>朝まづめ（めやす）</span><span class="dd">${mz ? `${hmText(mz.morning[0])}〜${hmText(mz.morning[1])}` : "—"}<span class="note">${mz ? `夕まづめ ${hmText(mz.evening[0])}〜${hmText(mz.evening[1])}` : "日本の港だけ"}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
-      <a class="fact" href="#sec-wave"><span class="dt"><span class="ls-icon is-text" data-icon="thermometer" aria-hidden="true"></span>水温</span><span class="dd">${fmt(sst)}<span class="unit">℃</span><span class="note">${cur ? `沖の流れ ${curText}` : NAMES.openMeteo}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
+    <div class="sum-group">
+        <a class="mini" href="#sec-tide"><span class="mini-title">${moonIcon}潮${tide ? ` ${esc(tide.moon.title)}` : ""}<span class="go ls-icon" data-icon="next" aria-hidden="true"></span></span><div id="mini-tide"></div></a>
+      <div class="facts">
+        <a class="fact" href="#sec-tide"><span class="dt"><span class="ls-icon is-text" data-icon="moon" aria-hidden="true"></span>潮</span><span class="dd">${tide ? esc(tide.moon.title) : "—"}<span class="note">${!tide ? (tideWaiting(day.ymd) ? "読みこみ中…" : ctx.port ? "読めませんでした" : "日本の港だけ") : nextTide ? `${tideDiff ? `${tideDiff}<br>` : ""}つぎ ${nextTide.when || ""}${nextTide.k} ${esc(nextTide.time)}` : "満潮・干潮の時刻を読めませんでした"}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
+        <a class="fact" href="#sec-tide"><span class="dt"><span class="ls-icon is-text" data-icon="sunrise" aria-hidden="true"></span>朝まづめ（めやす）</span><span class="dd">${mz ? `${hmText(mz.morning[0])}〜${hmText(mz.morning[1])}` : "—"}<span class="note">${mz ? `夕まづめ ${hmText(mz.evening[0])}〜${hmText(mz.evening[1])}` : "日本の港だけ"}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
+        <a class="fact" href="#sec-wave"><span class="dt"><span class="ls-icon is-text" data-icon="thermometer" aria-hidden="true"></span>水温</span><span class="dd">${fmt(sst)}<span class="unit">℃</span><span class="note">${cur ? `沖の流れ ${curText}` : NAMES.openMeteo}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
+      </div>
+    </div>
+    <div class="sum-group">
+        <a class="mini" href="#sec-wind"><span class="mini-title">${windIcon}風 m/s<span class="go ls-icon" data-icon="next" aria-hidden="true"></span></span><div id="mini-wind"></div></a>
+      <div class="facts">
+        <a class="fact" href="#sec-wind"><span class="dt"><span class="ls-icon is-text" data-icon="wind" aria-hidden="true"></span>風（${wind.filter(s => valueAt(s, h) != null).length}つの予報）</span><span class="dd">${r ? spread(r) : "—"}<span class="unit">m/s</span><span class="note">${windDir != null ? (state.windDir === "deg" ? `向き ${windDirText(windDir)}` : `${dirName(windDir)}の風`) : ""}${gustMax != null ? `<br>突風 ${fmt(gustMax, 0)} m/s まで` : ""}${amedas?.wind != null ? `<br>実況 ${fmt(amedas.wind)} m/s（${esc(amedas.name)} ${esc(amedas.time)}）` : ""}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
+      </div>
+    </div>
+    </div>
+    <div class="facts sum-rest">
       <a class="fact" href="#sec-weather"><span class="dt"><span class="ls-icon is-text" data-icon="cloud-sun" aria-hidden="true"></span>天気（${h}時）</span><span class="dd text">${wh ? esc(wxName(sliceDay(wh.weather_code, state.day)[h])) : "—"}<span class="note">${wh && sliceDay(wh.precipitation_probability, state.day)[h] != null ? `降水確率 ${sliceDay(wh.precipitation_probability, state.day)[h]}%` : ""}${pop ? `・${NAMES.jma} ${esc(pop.pop)}%（${pop.from}〜${pop.from + 6}時）` : ""}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>
     </div>`;
   // おくるんのカード（いま見ている日・時刻のめやす）。カードのボタンは、受けとった人がその場所のいまの予報を開くリンク
@@ -268,6 +283,7 @@ function render() {
   }
   // ウィジェットと同じ小さいグラフ（押すと詳しい欄へ）
   drawChart(document.getElementById("mini-wave"), { series: waves, bands, yFloor: 0, unit: "m", mini: true, waiting: waveWait });
+  drawChart(document.getElementById("mini-wind"), { series: wind, bands, yFloor: 0, unit: "m/s", mini: true, waiting: windWait });
   if (tideS.length) drawChart(document.getElementById("mini-tide"), { series: tideS.slice(0, 1), bands, marks, unit: "cm", mini: true });
   else document.getElementById("mini-tide").innerHTML = `<p class="muted small" style="margin:8px 0 0">${tideWait ? "読みこみ中…" : "潮汐表は日本の港だけ"}</p>`;
 }

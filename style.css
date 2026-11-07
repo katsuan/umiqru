@@ -212,12 +212,16 @@ details.models li b { white-space: nowrap; color: var(--text); }
 section[id^="sec-"], #tabs, #place-info { scroll-margin-top: 8px; }
 /* タブの帯は上に残るので、欄の中の段へ送るときは帯の高さぶんあける */
 #waves { scroll-margin-top: 112px; }
-.minis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0 0 16px; }
+/* まとめ：波・潮・風のまとまり（グラフ → 数字のカード）。広い画面では横に3つ */
+.sum-groups { display: grid; gap: 24px; }
+.sum-group { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.sum-rest { margin-top: 24px; }
+@media (min-width: 900px) { .sum-groups { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 a.mini { display: block; min-width: 0; color: inherit; text-decoration: none; border: 1px solid var(--grid); border-radius: 8px; padding: 8px 8px 4px; }
 .mini-title { display: flex; align-items: center; gap: 2px; font-size: 13px; color: var(--text-2); }
 .mini-title .go { margin-left: auto; }
 /* 小さいグラフの字（目盛り・満潮干潮の時刻）も、ライト・ダークに合わせた字の色 */
-.chart .mini-tick, #mini-wave text, #mini-tide text { font-size: 9px; fill: var(--text-3); }
+.chart .mini-tick, #mini-wave text, #mini-tide text, #mini-wind text { font-size: 9px; fill: var(--text-3); }
 .facts a.fact { display: block; position: relative; color: inherit; text-decoration: none; border-radius: 8px; padding: 4px 24px 4px 0; }
 .facts a.fact .go, .mini-title .go { color: var(--text-3); font-size: 14px; }
 .facts a.fact .go { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); }
