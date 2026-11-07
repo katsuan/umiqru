@@ -86,7 +86,9 @@
   /* まとめ */
   .summary-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
   .summary-head strong { font-size: 16px; }
-  .where { font-size: 13px; color: var(--text-3); margin: 0 0 16px; }
+  .where { font-size: 13px; color: var(--text-3); margin: 0; }
+  .place-info { margin: 0 0 16px; }
+  .place-info:empty { margin: 0; }
   .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin: 0; }
   .facts .dt { display: block; font-size: 13px; color: var(--text-3); }
   .facts .dd { display: block; margin: 0; font-size: 20px; font-weight: 700; }
@@ -197,7 +199,7 @@ details.models li b { white-space: nowrap; color: var(--text); }
 
 /* まとめ（ウィジェットと同じ見え方）：小さいグラフと、押すと詳しい欄へ飛ぶ項目 */
 @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
-section[id^="sec-"], #tabs { scroll-margin-top: 8px; }
+section[id^="sec-"], #tabs, #place-info { scroll-margin-top: 8px; }
 /* タブの帯は上に残るので、欄の中の段へ送るときは帯の高さぶんあける */
 #waves { scroll-margin-top: 112px; }
 .minis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0 0 16px; }

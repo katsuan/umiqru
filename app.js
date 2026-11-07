@@ -215,9 +215,10 @@ function render() {
   const sst = sliceDay(d.sea?.hourly?.sea_surface_temperature, state.day)[h];
   const waveIcon = `<span class="ls-icon is-text" data-icon="waves" aria-hidden="true"></span>`;
   const moonIcon = `<span class="ls-icon is-text" data-icon="moon" aria-hidden="true"></span>`;
-  document.getElementById("summary").innerHTML = `
+  document.getElementById("place-info").innerHTML = `
     <div class="summary-head"><strong>${esc(state.place.name)}${state.place.coords && ctx.jma ? `（${esc(ctx.jma.muniName)}）` : ""}</strong><span class="sub">${day.short} ${h}時${ctx.jma ? "" : "（日本時間）"}</span></div>
-    <p class="where">潮：${ctx.port ? `${esc(ctx.port.name)}の港（${ctx.port.km.toFixed(0)}km）` : "—"}　${NAMES.jma}：${ctx.jma ? esc(ctx.jma.name) : "—"}</p>
+    <p class="where">潮：${ctx.port ? `${esc(ctx.port.name)}の港（${ctx.port.km.toFixed(0)}km）` : "—"}　${NAMES.jma}：${ctx.jma ? esc(ctx.jma.name) : "—"}</p>`;
+  document.getElementById("summary").innerHTML = `
     <div class="minis">
       <a class="mini" href="#sec-wave"><span class="mini-title">${waveIcon}波 m<span class="go ls-icon" data-icon="next" aria-hidden="true"></span></span><div id="mini-wave"></div></a>
       <a class="mini" href="#sec-tide"><span class="mini-title">${moonIcon}潮${tide ? ` ${esc(tide.moon.title)}` : ""}<span class="go ls-icon" data-icon="next" aria-hidden="true"></span></span><div id="mini-tide"></div></a>
@@ -357,7 +358,7 @@ function showTab(key, scroll = false) {
   Object.keys(tlScroll).forEach(id => delete tlScroll[id]);
   render();
   // 描き直しで高さが変わったあとで送る。すぐに送ると、途中で止まることがある
-  if (scroll) scrollToEl(typeof scroll === "string" ? scroll : "tabs");
+  if (scroll) scrollToEl(typeof scroll === "string" ? scroll : "place-info");
 }
 const scrollToEl = id => setTimeout(() => document.getElementById(id).scrollIntoView({ block: "start" }), 50);
 function initTabs() {
