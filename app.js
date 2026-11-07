@@ -8,7 +8,7 @@ import { dayLabel, hm, hmText, hourlyPoints, sliceDay, tokyoParts } from "./js/t
 import { findPlace, km, placeContext } from "./js/place.js";
 import { loadForecasts, loadTide, tideFor, tideWaiting } from "./js/forecast.js";
 import { jmaWarnings } from "./js/jma.js";
-import { arrow, dirName, esc, fmt, rainCell, rainMmCell, range, tempCell, tideEvents, tideRange, valueAt, wxName, wxShort } from "./js/format.js";
+import { arrow, dirName, esc, fmt, meanDir, rainCell, rainMmCell, range, tempCell, tideEvents, tideRange, valueAt, wxName, wxShort } from "./js/format.js";
 import { dashSwatch, drawChart, legend, timeline, tlScroll } from "./js/chart.js";
 
 // ---- 線 ----
@@ -281,7 +281,14 @@ function render() {
   }
   // ウィジェットと同じ小さいグラフ（押すと詳しい欄へ）
   drawChart(document.getElementById("mini-wave"), { series: waves, bands, yFloor: 0, unit: "m", mini: true, waiting: waveWait });
-  drawChart(document.getElementById("mini-wind"), { series: wind, bands, yFloor: 0, unit: "m/s", mini: true, waiting: windWait });
+  // 3時間ごとに、予報をならした向き（ウィジェットと同じ。45° より割れていればうすく）
+  const windArrows = [];
+  for (let t = 0; t <= 24; t += 3) {
+    const k = Math.min(23, t);
+    const md = meanDir(wind.map(s => ({ sp: valueAt(s, k), dir: s.dir[k] })));
+    if (md) windArrows.push({ x: t, deg: md.deg, faint: md.spread > 45, calm: md.calm });
+  }
+  drawChart(document.getElementById("mini-wind"), { series: wind, bands, yFloor: 0, unit: "m/s", mini: true, waiting: windWait, arrows: windArrows });
   if (tideS.length) drawChart(document.getElementById("mini-tide"), { series: tideS.slice(0, 1), bands, marks, unit: "cm", mini: true });
   else document.getElementById("mini-tide").innerHTML = `<p class="muted small" style="margin:8px 0 0">${tideWait ? "読みこみ中…" : "潮汐表は日本の港だけ"}</p>`;
 }

@@ -14,11 +14,13 @@ export function niceScale(min, max, count = 4) {
 }
 // mini … まとめの小さいグラフ（目盛りの字・線の名前なし。触っても時刻は変えない。押すと詳しい欄へ）
 // waiting … まだ届いていない（空なら「この日のデータはありません」でなく「読みこみ中」）
-export function drawChart(el, { series, bands = [], marks = [], yFloor = null, unit = "", endLabels = true, mini = false, waiting = false }) {
+// arrows … グラフの下に並べる風の向きの矢印 [{ x: 時, deg: 来る向き, faint: 予報が割れている, calm: ほぼ無風 }]。矢印は吹いていく向き
+export function drawChart(el, { series, bands = [], marks = [], yFloor = null, unit = "", endLabels = true, mini = false, waiting = false, arrows = [] }) {
   const W = Math.max(mini ? 120 : 280, el.clientWidth || 320);
-  const H = mini ? 80 : 200;
+  const AH = arrows.length ? 18 : 0;
+  const H = (mini ? 80 : 200) + AH;
   // 小さいグラフに満潮・干潮の時刻を書くときは、上と下に字のぶんのあき
-  const m = mini ? { l: 2, r: 2, t: marks.length ? 14 : 6, b: marks.length ? 26 : 14 } : { l: 40, r: endLabels ? 56 : 16, t: 16, b: 24 };
+  const m = mini ? { l: 2, r: 2, t: marks.length ? 14 : 6, b: (marks.length ? 26 : 14) + AH } : { l: 40, r: endLabels ? 56 : 16, t: 16, b: 24 + AH };
   const pw = W - m.l - m.r, ph = H - m.t - m.b;
   const ys = series.flatMap(s => s.points.map(p => p.y)).filter(v => v != null);
   if (!ys.length) { el.innerHTML = `<p class="muted small">${waiting ? "読みこみ中…" : "この日のデータはありません。"}</p>`; return; }
@@ -46,6 +48,13 @@ export function drawChart(el, { series, bands = [], marks = [], yFloor = null, u
     });
     // dash … 同じ機関の2つ目の計算（同じ色の点線）
     if (d) g += `<path d="${d}" fill="none" stroke="var(${s.color})" stroke-width="${mini ? 1.5 : 2}" stroke-linejoin="round" stroke-linecap="round"${s.dash ? ` stroke-dasharray="${mini ? "3 3" : "5 4"}"` : ""}/>`;
+  });
+  // 風の向きの矢印（下向きの矢印を来る向きのぶん回す＝吹いていく向き。表の矢印と同じ）
+  arrows.forEach(a => {
+    const x = Math.max(m.l + 7, Math.min(W - m.r - 7, X(a.x))).toFixed(1), y = (m.t + ph + 10).toFixed(1);
+    const color = a.faint || a.calm ? "var(--text-3)" : "var(--text)";
+    g += a.calm ? `<circle cx="${x}" cy="${y}" r="1.5" fill="${color}"/>`
+      : `<path transform="translate(${x} ${y}) rotate(${a.deg.toFixed(0)})" d="M0 -6V6M-3.5 2.5L0 6L3.5 2.5" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"${a.faint ? ' opacity="0.6"' : ""}/>`;
   });
   // 満潮・干潮などの印（字は字の色）
   marks.forEach(k => {

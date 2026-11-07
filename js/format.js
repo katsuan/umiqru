@@ -72,3 +72,17 @@ export function tempCell(t) {
   const rgb = diff < 0 ? "42,120,214" : "235,104,52";
   return ` style="background:rgba(${rgb},${a.toFixed(2)})${a >= 0.55 ? ";color:#fff" : ""}"`;
 }
+
+// 予報をならした風の向き。風速の重みつきで東西・南北に分けて平均する（340° と 20° は北。角度の平均の 180° にしない）。
+// list … [{ sp: 風速, dir: 来る向き }]。spread … いちばん離れた予報と平均の角度の差。calm … 平均の風速が 0.5 m/s 未満。
+// SQriptable の sea カード（seaMeanDir）と同じ計算
+export function meanDir(list) {
+  list = list.filter(m => m.sp != null && m.dir != null);
+  if (!list.length) return null;
+  const r = Math.PI / 180;
+  const x = list.reduce((a, m) => a + m.sp * Math.sin(m.dir * r), 0) / list.length;
+  const y = list.reduce((a, m) => a + m.sp * Math.cos(m.dir * r), 0) / list.length;
+  const deg = ((Math.atan2(x, y) / r) % 360 + 360) % 360;
+  const spread = Math.max(...list.map(m => Math.abs((((m.dir - deg) % 360) + 540) % 360 - 180)));
+  return { deg, spread, calm: Math.hypot(x, y) < 0.5 };
+}
