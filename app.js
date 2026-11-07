@@ -229,7 +229,7 @@ function render() {
   // 潮（天気も）→ 波 → 風 の順に（ウィジェットと同じ）、グラフ → 数字のカード。潮のまとまりは4枚（広い画面では2×2）
   document.getElementById("summary").innerHTML = `
     <div class="sum-groups">
-    <div class="sum-group is-four">
+    <div class="sum-group">
         <a class="mini" href="#sec-tide"><span class="mini-title">${moonIcon}潮${tide ? ` ${esc(tide.moon.title)}` : ""}<span class="go ls-icon" data-icon="next" aria-hidden="true"></span></span><div id="mini-tide"></div></a>
       <div class="facts">
         <a class="fact" href="#sec-tide"><span class="dt"><span class="ls-icon is-text" data-icon="moon" aria-hidden="true"></span>潮</span><span class="dd">${tide ? esc(tide.moon.title) : "—"}<span class="note">${!tide ? (tideWaiting(day.ymd) ? "読みこみ中…" : ctx.port ? "読めませんでした" : "日本の港だけ") : nextTide ? `${tideDiff ? `${tideDiff}<br>` : ""}つぎ ${nextTide.when || ""}${nextTide.k} ${esc(nextTide.time)}` : "満潮・干潮の時刻を読めませんでした"}</span></span><span class="go ls-icon" data-icon="next" aria-hidden="true"></span></a>

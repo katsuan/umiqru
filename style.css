@@ -212,14 +212,13 @@ details.models li b { white-space: nowrap; color: var(--text); }
 section[id^="sec-"], #tabs, #place-info { scroll-margin-top: 8px; }
 /* タブの帯は上に残るので、欄の中の段へ送るときは帯の高さぶんあける */
 #waves { scroll-margin-top: 112px; }
-/* まとめ：潮（天気も）・波・風のまとまり（グラフ → 数字のカード）。上から1つずつ。広い画面では、左にグラフ・右に数字（4枚のまとまりは半分ずつで 2×2） */
+/* まとめ：潮（天気も）・波・風のまとまり（グラフ → 数字のカード）。上から1つずつ。広い画面では、左にグラフ・右に数字（境目はどれも同じ位置） */
 .sum-groups { display: grid; gap: 24px; }
 .sum-group { display: grid; gap: 8px; align-content: start; min-width: 0; }
 @media (min-width: 640px) {
-  .sum-group { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; align-items: start; }
-  .sum-group .facts { grid-template-columns: minmax(0, 1fr); gap: 8px; }
-  .sum-group.is-four { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .sum-group.is-four .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* グラフとカードの境目は、どのまとまりも同じ位置（半分ずつ）。カードは2列 */
+  .sum-group { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .sum-group .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 }
 a.mini { display: block; min-width: 0; color: inherit; text-decoration: none; border: 1px solid var(--grid); border-radius: 8px; padding: 8px 8px 4px; }
 .mini-title { display: flex; align-items: center; gap: 2px; font-size: 13px; color: var(--text-2); }
