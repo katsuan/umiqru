@@ -11,6 +11,7 @@ import { jmaWarnings } from "./js/jma.js";
 import { arrow, baseName, dirName, esc, fmt, meanDir, spread, rainCell, rainMmCell, range, tempCell, tideEvents, tideRange, valueAt, wxName, wxShort } from "./js/format.js";
 import { dashSwatch, drawChart, legend, timeline, tlScroll } from "./js/chart.js";
 import { diaryNow, drawDiary, drawDiaryShell, initDiary } from "./js/diary.js";
+import { canCard, oqrnCardUrl, pageUrl } from "./js/card.js";
 
 // ---- 線 ----
 function windSeries(d) {
@@ -300,7 +301,7 @@ function drawShare(v) {
   const box = document.getElementById("share");
   box.hidden = false;
   box.innerHTML = `<h2 class="share-title">${esc(baseName(state.place.name))}の海を送る</h2>
-    <div class="share-row">${window.OQRN ? `<a class="ls-button line is-oqrn" id="send-card" href="${esc(cardUrl(v))}">カードでおくるん</a>` : ""}<button type="button" class="ls-button" id="share-link">${icon(navigator.share ? "share" : "link")}${navigator.share ? "リンクを共有" : "リンクをコピー"}</button></div>
+    <div class="share-row">${canCard() ? `<a class="ls-button line is-oqrn" id="send-card" href="${esc(cardUrl(v))}">カードでおくるん</a>` : ""}<button type="button" class="ls-button" id="share-link">${icon(navigator.share ? "share" : "link")}${navigator.share ? "リンクを共有" : "リンクをコピー"}</button></div>
     <p class="muted small share-note">カードには ${v.day.short} ${v.h}時のめやす（波・風・潮・天気・水温）が入り、カードのボタンからこの場所の${NAMES.app}が開きます。</p>`;
 }
 function cardUrl(v) {
@@ -311,20 +312,13 @@ function cardUrl(v) {
     v.code != null ? `☁️ ${wxName(v.code)}${v.rain != null ? `・降水確率 ${v.rain}%` : ""}` : "",
     v.sst != null ? `🌡️ 水温 ${fmt(v.sst)}℃` : "",
   ].filter(Boolean);
-  return window.OQRN.cardUrl(new URLSearchParams({
-    headerTitle: `🌊 ${NAMES.app}`,
+  return oqrnCardUrl({
+    header: `🌊 ${NAMES.app}`,
     date: `🕒 ${v.day.short} ${v.h}時のめやす`,
     title: placeTitle(),
     detail: lines.join("\n") || "予報を読みこめませんでした",
-    showDate: "true",
-    theme: "custom",
-    customColor: CARD_COLOR,
-    bubbleSize: "mega",
-    showAction: "true",
-    actionLabel: `🌊 ${NAMES.app}で見る`,
     actionUrl: shareUrl(),
-    from: "umiqru", // おくるんで、うみくるから来たと数える（送ったあとに「うみくるに戻る」）
-  }));
+  });
 }
 
 // 日記に残す、いま見ている場所・日時と、その時刻の予報・潮・観測
@@ -387,11 +381,9 @@ function remember(place) {
   store.set("umiqru:recent", list.slice(0, 6));
   drawRecent();
 }
-// 同じ名前のほかの場所（開け閉めの欄から選ぶ）。選んだあとも、もとの場所を候補に残す
-// おくるんのカードの色（なかまのツールの一覧 q-oqrn の data/hub-links.json の umiqru と同じ）
-const CARD_COLOR = "#0E6E9E";
 // いま見ている場所を開くリンク（?q= はウィジェットの Parameter と同じ書き方）
-const shareUrl = () => `${location.origin}${location.pathname}?q=${encodeURIComponent(placeParam())}`;
+const shareUrl = () => pageUrl(placeParam());
+// 同じ名前のほかの場所（開け閉めの欄から選ぶ）。選んだあとも、もとの場所を候補に残す
 let altsOpen = false;
 const placeInfo = document.getElementById("place-info");
 placeInfo.addEventListener("toggle", ev => { if (ev.target.matches("details.alts")) altsOpen = ev.target.open; }, true);

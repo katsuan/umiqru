@@ -310,3 +310,4 @@ details.diary-keep summary { cursor: pointer; color: var(--text-3); }
 .diary-keep-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
 .diary-keep-row label.ls-button { cursor: pointer; }
 details.diary-keep p { margin: 8px 0 0; }
+.entry-send { margin-top: 8px; }

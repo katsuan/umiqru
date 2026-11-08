@@ -6,6 +6,7 @@ import { store } from "./store.js";
 import { WEEK, addDays, tokyoParts } from "./time.js";
 import { dirName, esc, fmt, spread } from "./format.js";
 import { diaryDb } from "./diary-db.js";
+import { canCard, oqrnCardUrl, pageUrl } from "./card.js";
 
 // 見た海のようす（1つずつ選ぶ。もう一度押すと外れる）と、したこと（いくつでも）
 const SAW = [
@@ -28,6 +29,7 @@ let editing = null; // 書いている日記（新しいものは id なし）
 let pending = []; // 書いている日記の写真 { id, buf, type, url, saved }
 let dropped = []; // 書いている日記から外した、残してあった写真の id
 const urls = new Map(); // 写真の id → 画面に出す URL
+const records = new Map(); // 写真の id → { type, buf }（共有するとき、押してすぐ写真を渡せるように）
 
 const icon = name => `<span class="ls-icon is-text" data-icon="${name}" aria-hidden="true"></span>`;
 const box = () => document.getElementById("sec-diary");
@@ -128,6 +130,10 @@ function entryHtml(e) {
     ${fish ? `<ul class="entry-fish">${fish}</ul>` : ""}
     ${e.memo ? `<p class="entry-memo">${esc(e.memo)}</p>` : ""}
     ${snapHtml(e)}
+    <div class="share-row entry-send">
+      ${canCard() ? `<a class="ls-button line is-oqrn" href="${esc(cardUrl(e))}">カードでおくるん</a>` : ""}
+      <button type="button" class="ls-button" data-share="${esc(e.id)}">${icon(navigator.share ? "share" : "copy")}${navigator.share ? "共有" : "文をコピー"}</button>
+    </div>
     <div class="entry-actions">
       <button type="button" class="ls-button" data-edit="${esc(e.id)}">${icon("edit")}なおす</button>
       <button type="button" class="ls-button" data-delete="${esc(e.id)}">${icon("delete")}消す</button>
@@ -149,6 +155,57 @@ function snapHtml(e) {
   ].filter(Boolean);
   return rows.length ? `<details class="entry-snap"><summary>${e.hour}時の予報と観測</summary>
     <dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl></details>` : "";
+}
+
+// ---- 送る（おくるんのカード・端末の共有） ----
+// 日記の場所を開くリンク（場所は書いたときの位置と名前で。ウィジェットの Parameter と同じ書き方）
+const entryUrl = e => pageUrl(`${e.place.lat.toFixed(4)},${e.place.lon.toFixed(4)}=${e.place.name}`);
+// 日記を文に（カードの中身と、共有の文）。forecast … そのときの予報も入れるか
+function entryLines(e, forecast = true) {
+  const saw = SAW.map(s => e.saw?.[s.key] ? `${s.label} ${e.saw[s.key]}` : "").filter(Boolean).join("・");
+  const fish = (e.catches || []).filter(c => c.fish).map(c => `${c.fish}${c.count ? ` ${c.count}匹` : ""}${c.size ? ` ${c.size}cm` : ""}`).join("・");
+  const memo = (e.memo || "").length > 200 ? `${e.memo.slice(0, 200)}…` : e.memo;
+  const s = e.snap;
+  const fc = forecast && s ? [
+    s.wave && `🌊 波 ${spread(s.wave)} m`,
+    s.wind && `💨 風 ${s.windDir != null ? `${dirName(s.windDir)} ` : ""}${spread(s.wind)} m/s${s.gust != null ? `（突風 ${fmt(s.gust, 0)}）` : ""}`,
+    s.tide && `🌙 ${s.tide.moon}${s.tide.diff ? `・${s.tide.diff}` : ""}`,
+    (s.wx || s.temp != null) && `☁️ ${[s.wx, s.temp != null && `${fmt(s.temp, 0)}℃`].filter(Boolean).join("・")}`,
+    s.sst != null && `🌡️ 水温 ${fmt(s.sst)}℃`,
+  ].filter(Boolean) : [];
+  return [
+    saw && `👀 ${saw}`,
+    (e.did || []).length && `🏖️ ${e.did.join("・")}`,
+    fish && `🎣 ${fish}`,
+    memo && `📝 ${memo}`,
+    ...(fc.length ? ["", `${e.hour}時の予報`, ...fc] : []),
+  ].filter(x => x || x === "");
+}
+function cardUrl(e) {
+  return oqrnCardUrl({
+    header: `🌊 ${NAMES.app}の日記`,
+    date: `🕒 ${ymdText(e.ymd)} ${e.hour}時`,
+    title: e.placeTitle || e.place?.name || "",
+    detail: entryLines(e).join("\n") || "海の日記",
+    actionUrl: entryUrl(e),
+  });
+}
+// 端末の共有の画面で、文・リンクと写真をいっしょに（写真を渡せない端末は文とリンクだけ。共有がなければ文をコピー）
+async function shareEntry(e, btn) {
+  if (!e) return;
+  const text = [`${ymdText(e.ymd)} ${e.hour}時 ${e.placeTitle || e.place.name}`, ...entryLines(e)].join("\n");
+  const url = entryUrl(e);
+  if (!navigator.share) {
+    const label = btn.innerHTML;
+    try { await navigator.clipboard.writeText(`${text}\n${url}`); btn.textContent = "コピーしました"; }
+    catch { btn.textContent = "コピーできませんでした"; }
+    setTimeout(() => { btn.innerHTML = label; }, 2000);
+    return;
+  }
+  // 写真は表示のときに読んであるので、押してすぐ渡せる（間があくと iPhone で共有の画面が出ない）
+  const files = (e.photos || []).map((id, i) => records.get(id) && new File([records.get(id).buf], `${e.ymd}-${i + 1}.jpg`, { type: records.get(id).type })).filter(Boolean);
+  const withFiles = files.length && navigator.canShare?.({ files }) ? { files } : {};
+  navigator.share({ title: `${NAMES.app}の日記`, text: withFiles.files ? `${text}\n${url}` : text, url: withFiles.files ? undefined : url, ...withFiles }).catch(() => {});
 }
 
 // ---- 書く・なおす ----
@@ -258,6 +315,7 @@ async function photoUrl(id) {
   if (urls.has(id)) return urls.get(id);
   const p = await diaryDb.photo(id).catch(() => null);
   if (!p) return "";
+  records.set(id, p);
   const u = URL.createObjectURL(new Blob([p.buf], { type: p.type }));
   urls.set(id, u);
   return u;
@@ -354,6 +412,7 @@ async function onClick(ev) {
     drawPics();
   } else if ("cancel" in d) stopEdit();
   else if ("save" in d) save(t);
+  else if (d.share) shareEntry(entries.find(e => e.id === d.share), t);
   else if (d.edit) startEdit(entries.find(e => e.id === d.edit));
   else if (d.delete) {
     const e = entries.find(x => x.id === d.delete);
