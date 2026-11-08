@@ -10,6 +10,7 @@ import { loadForecasts, loadTide, tideFor, tideWaiting } from "./js/forecast.js"
 import { jmaWarnings } from "./js/jma.js";
 import { arrow, baseName, dirName, esc, fmt, meanDir, spread, rainCell, rainMmCell, range, tempCell, tideEvents, tideRange, valueAt, wxName, wxShort } from "./js/format.js";
 import { dashSwatch, drawChart, legend, timeline, tlScroll } from "./js/chart.js";
+import { diaryNow, drawDiary, drawDiaryShell, initDiary } from "./js/diary.js";
 
 // ---- 線 ----
 function windSeries(d) {
@@ -209,7 +210,7 @@ function render() {
   const v = {
     day, h, tide, tideDiff, nextTide, mz, cur, curText, amedas, pop, text,
     sst: sliceDay(d.sea?.hourly?.sea_surface_temperature, state.day)[h],
-    code: at("weather_code"), rain: at("precipitation_probability"),
+    code: at("weather_code"), rain: at("precipitation_probability"), temp: at("temperature_2m"),
     wr: range(waves.map(s => valueAt(s, h))),
     waveTop: text?.nums.length ? Math.max(...text.nums) : null,
     wind: range(wind.map(s => valueAt(s, h))),
@@ -220,6 +221,7 @@ function render() {
   drawPlaceInfo(v);
   drawSummary(v);
   drawShare(v);
+  diaryNow(diaryContext(v));
   // ウィジェットと同じ小さいグラフ（押すと詳しい欄へ）
   drawChart(document.getElementById("mini-wave"), { series: waves, bands, yFloor: 0, unit: "m", mini: true, waiting: waveWait });
   drawChart(document.getElementById("mini-wind"), { series: wind, bands, yFloor: 0, unit: "m/s", mini: true, waiting: windWait, arrows: windArrows(wind) });
@@ -323,6 +325,25 @@ function cardUrl(v) {
     actionUrl: shareUrl(),
     from: "umiqru", // おくるんで、うみくるから来たと数える（送ったあとに「うみくるに戻る」）
   }));
+}
+
+// 日記に残す、いま見ている場所・日時と、その時刻の予報・潮・観測
+function diaryContext(v) {
+  const p = state.place, { tide, mz } = v;
+  return {
+    day: v.day, h: v.h,
+    place: { name: p.alts ? baseName(p.name) : p.name, lat: p.lat, lon: p.lon, pinned: true },
+    placeTitle: placeTitle(),
+    snap: {
+      tide: tide ? { moon: tide.moon.title, diff: v.tideDiff, port: state.ctx.port?.name, events: tideEvents(tide, hm).map(t => `${t.k} ${t.time}`).join("・") } : null,
+      mazume: mz ? `朝 ${hmText(mz.morning[0])}〜${hmText(mz.morning[1])}・夕 ${hmText(mz.evening[0])}〜${hmText(mz.evening[1])}` : null,
+      wave: v.wr, waveJma: v.text?.wave || null,
+      wind: v.wind, windDir: v.windDir ?? null, gust: v.gustMax,
+      sst: v.sst ?? null, cur: v.cur,
+      wx: v.code != null ? wxName(v.code) : null, rain: v.rain ?? null, temp: v.temp ?? null,
+      amedas: v.amedas ? { name: v.amedas.name, time: v.amedas.time, wind: v.amedas.wind, dir: v.amedas.dir, temp: v.amedas.temp } : null,
+    },
+  };
 }
 
 // ---- 流れ ----
@@ -455,7 +476,7 @@ function drawHowto() {
 
 // ---- くわしい欄のタブ ----
 // まとめ（ダッシュボード）が先頭。くわしい欄はウィジェットと同じ並び（潮・波・風・天気）
-const TABS = ["summary", "tide", "wave", "wind", "weather"];
+const TABS = ["summary", "tide", "wave", "wind", "weather", "diary"];
 const panelOf = k => document.getElementById(k === "summary" ? "summary" : `sec-${k}`);
 // key の欄だけを出す。scroll … true ならタブの帯、id ならその段が見えるところまで送る（まとめの項目を押したとき）
 function showTab(key, scroll = false) {
@@ -471,6 +492,7 @@ function showTab(key, scroll = false) {
   // 隠れていた欄は幅が0なので、出してから描き直す。横スクロールの表は、えらんだ時刻まで送りなおす
   Object.keys(tlScroll).forEach(id => delete tlScroll[id]);
   render();
+  if (key === "diary") drawDiary();
   // 描き直しで高さが変わったあとで送る。すぐに送ると、途中で止まることがある
   if (scroll) scrollToEl(typeof scroll === "string" ? scroll : "place-info");
 }
@@ -562,6 +584,20 @@ function init() {
   window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(render, 150); });
   drawRecent();
   drawHowto();
+  drawDiaryShell();
+  initDiary({
+    // 日記の日時を変えたら、ページもその日・時刻に（その予報を日記に残せるように）
+    setView(day, hour) {
+      if (day !== state.day) { state.day = day; state.hour = hour; refreshTide(); }
+      else setHour(hour);
+    },
+    // 日記の場所を開く（今日の、まとめのタブで）
+    openPlace(e) {
+      state.day = 0; state.hour = tokyoParts().hour;
+      go(e.place);
+      showTab("summary", true);
+    },
+  });
   initTabs();
   // ウィジェットの「新しい版があります」の通知から開いたとき（#howto）は、入れ方の欄を開いてそこまで
   if (location.hash === "#howto") {

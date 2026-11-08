@@ -240,5 +240,73 @@ a.fact:focus-visible, a.mini:focus-visible { outline: 2px solid var(--text-2); o
   --ls-text: var(--text); --ls-subtext: var(--text-2);
   margin-bottom: 16px;
 }
-#tabs .ls-tab { font: inherit; font-weight: 600; }
+#tabs .ls-tab { font: inherit; font-weight: 600; padding: 0; white-space: nowrap; }
+/* タブが6つでも、320px の幅で1行に */
+@media (max-width: 400px) { #tabs .ls-tab { font-size: 14px; } }
 #tabs .ls-tab:focus-visible { outline: 2px solid var(--text-2); outline-offset: -2px; }
+
+/* 海の日記（日記タブ）。Q キットの入力・チップ・ボタンを、うみくるの色で */
+#sec-diary {
+  --ls-surface: var(--surface); --ls-surface-sub: var(--band); --ls-bg: var(--bg);
+  --ls-text: var(--text); --ls-subtext: var(--text-2); --ls-faint: var(--text-3);
+  --ls-line: var(--line); --ls-line-strong: var(--line);
+  --ls-accent: var(--accent); --ls-accent-strong: var(--accent);
+}
+#sec-diary .ls-button.is-primary { color: var(--surface); }
+#sec-diary h2 .ls-icon { vertical-align: -0.15em; }
+.diary-lead { margin: 0 0 16px; }
+.diary-form { display: grid; gap: 16px; padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--grid); }
+.diary-form[hidden] { display: none; }
+.diary-form-title, .diary-day-title { font-size: 15px; margin: 0; }
+.diary-at { margin: 0; display: flex; align-items: center; gap: 8px; }
+.diary-note { margin: -8px 0 0; }
+select.ls-input { appearance: none; -webkit-appearance: none; color: var(--text); }
+.saw-row { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 8px; align-items: center; }
+.saw-key { font-size: 13px; color: var(--text-2); }
+.fish-rows { display: grid; gap: 8px; }
+.fish-row { display: grid; grid-template-columns: minmax(0, 1fr) 64px 64px 40px; gap: 8px; }
+.fish-row .ls-input { padding-inline: 8px; }
+.ls-field > .ls-button { justify-self: start; }
+.pic-add { justify-self: start; cursor: pointer; }
+.pic-add[hidden] { display: none; }
+.entry-pics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.entry-pics:empty { display: none; }
+.entry-pics img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; background: var(--band); }
+.pic { position: relative; }
+.pic-del { position: absolute; top: 4px; right: 4px; width: 32px; height: 32px; min-height: 0; padding: 0; background: var(--surface); border-radius: 50%; }
+.diary-actions { margin-top: 8px; }
+
+/* カレンダー */
+.cal-bar { display: grid; grid-template-columns: 40px auto minmax(0, 1fr) 40px; align-items: center; gap: 8px; margin-bottom: 8px; }
+.cal-bar strong { font-size: 16px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin-bottom: 16px; }
+.cal-head { font-size: 12px; color: var(--text-3); text-align: center; }
+.cal-day { display: grid; justify-items: center; align-content: start; gap: 2px; min-height: 56px; padding: 4px 0; font: inherit; font-size: 14px; color: var(--text-2); background: none; border: 1px solid transparent; border-radius: 8px; cursor: pointer; }
+.cal-day.is-today .cal-num { color: var(--text); font-weight: 700; }
+.cal-day[aria-pressed="true"] { border-color: var(--text); color: var(--text); }
+.cal-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-2); margin-top: 4px; }
+.cal-pic { width: 28px; height: 28px; object-fit: cover; border-radius: 50%; background: var(--band); }
+@media (hover: hover) { .cal-day:hover { background: var(--band); } }
+
+/* えらんだ日の日記 */
+#diary-day { display: grid; gap: 16px; }
+.entry { display: grid; gap: 8px; padding-top: 16px; border-top: 1px solid var(--grid); }
+.entry-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.entry-place { display: inline-flex; align-items: center; gap: 4px; font: inherit; font-size: 14px; color: var(--text-2); background: none; border: none; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line); }
+.entry-line, .entry-memo { margin: 0; font-size: 14px; }
+.entry-memo { white-space: pre-wrap; }
+.entry-fish { margin: 0; padding-left: 24px; font-size: 14px; }
+.entry-snap { font-size: 13px; color: var(--text-2); }
+.entry-snap summary { cursor: pointer; color: var(--text-3); }
+.entry-snap dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 16px; margin: 8px 0 0; }
+.entry-snap dt { color: var(--text-3); white-space: nowrap; }
+.entry-snap dd { margin: 0; }
+.entry-actions { display: flex; gap: 8px; }
+.entry-actions .ls-button { min-height: 32px; font-size: 13px; padding: 0 16px; }
+
+/* 週のはじまり・書き出し */
+details.diary-keep { margin-top: 16px; font-size: 13px; }
+details.diary-keep summary { cursor: pointer; color: var(--text-3); }
+.diary-keep-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+.diary-keep-row label.ls-button { cursor: pointer; }
+details.diary-keep p { margin: 8px 0 0; }

@@ -27,7 +27,6 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<body>
 <main>
   <header class="ls-brand">
     <h1 class="ls-brand-name"><img class="ls-brand-icon" src="icon.svg" alt="" width="30" height="30">うみくる</h1>
@@ -59,6 +58,7 @@
     <button type="button" class="ls-tab" role="tab" id="tab-wave" data-tab="wave" aria-controls="sec-wave">波</button>
     <button type="button" class="ls-tab" role="tab" id="tab-wind" data-tab="wind" aria-controls="sec-wind">風</button>
     <button type="button" class="ls-tab" role="tab" id="tab-weather" data-tab="weather" aria-controls="sec-weather">天気</button>
+    <button type="button" class="ls-tab" role="tab" id="tab-diary" data-tab="diary" aria-controls="sec-diary">日記</button>
   </div>
 
   <section class="card" id="summary" role="tabpanel" aria-labelledby="tab-summary"></section>
@@ -117,6 +117,9 @@
     </p>
   </section>
 
+  <!-- 海の日記（見た海・釣果・写真と、その日時の予報。この端末だけに残す）。中身は js/diary.js -->
+  <section class="card" id="sec-diary" role="tabpanel" aria-labelledby="tab-diary"></section>
+
   <!-- 見ている場所を送る（おくるんのカードと、リンク） -->
   <section class="card share-card" id="share" hidden></section>
 
@@ -137,6 +140,7 @@
 </main>
 
 <script src="https://katsuan.github.io/oqrn/shared/oqrn.js"></script>
+<script src="https://katsuan.github.io/oqrn/shared/week-start.js"></script>
 <script src="https://katsuan.github.io/oqrn/shared/ui.js" defer></script>
 <script type="module" src="app.js"></script>
 <script src="https://katsuan.github.io/oqrn/shared/tool-share.js" data-tool="umiqru" defer></script>
