@@ -1,0 +1,31 @@
+{
+  "note": "磯割：渡船ごとに、その日に上がる磯のまとまり。渡船の発表（下の sources）を見て入れる。毎日1つずつずれてくり返すので、anchor の日に shift 0 の渡船が groups[0]、shift 1 が groups[1] … として、そこからの日数で計算する。期間（from〜to）の外は「まだ発表されていない」。くり返しから外れる日は except に { \"2026-12-31\": { \"家中渡船\": \"グンカン\" } } のように書く",
+  "islands": [
+    {
+      "id": "uguru",
+      "name": "鵜来島",
+      "lat": 32.8026,
+      "lon": 132.4898,
+      "km": 6,
+      "periods": [
+        {
+          "from": "2026-10-01",
+          "to": "2027-06-30",
+          "anchor": "2026-11-01",
+          "groups": ["ホトバエ・カメ", "マルサゲ・姫島北", "グンカン"],
+          "ferries": [
+            { "name": "家中渡船", "shift": 0 },
+            { "name": "高見渡船", "shift": 1 },
+            { "name": "家本渡船", "shift": 2 }
+          ],
+          "checked": "2026-11-09"
+        }
+      ],
+      "except": {},
+      "sources": [
+        { "name": "沖の島の釣り（鵜来島の磯割表）", "url": "https://okinoshima-fishing.com/ugurushima-isowari/" },
+        { "name": "Fishing KOCHI（鵜来島 渡船 磯割）", "url": "https://fishingkochi.com/2026%E5%B9%B4%E3%80%80%E9%B5%9C%E6%9D%A5%E5%B3%B6%E3%80%80%E6%B8%A1%E8%88%B9%E3%80%80%E7%A3%AF%E5%89%B2%E3%80%80/" }
+      ]
+    }
+  ]
+}

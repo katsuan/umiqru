@@ -13,6 +13,7 @@ import { dashSwatch, drawChart, legend, timeline, tlScroll } from "./js/chart.js
 import { diaryNow, drawDiary, drawDiaryShell, initDiary } from "./js/diary.js";
 import { canCard, oqrnCardUrl, pageUrl } from "./js/card.js";
 import { mazume } from "./js/daydata.js";
+import { ferriesOf, isoOn, isoUntil, islandFor, loadIso, myFerry, setMyFerry } from "./js/iso.js";
 
 // ---- 線 ----
 function windSeries(d) {
@@ -285,6 +286,51 @@ function drawSummary(v) {
   ${group("#sec-wind", "wind", "風 m/s", "mini-wind", [
     fact({ href: "#sec-wind", ic: "wind", title: `風（${v.windCount}つの予報）`, value: v.wind ? spread(v.wind) : "—", unit: "m/s", note: windNote }),
   ])}
+  </div>${isoHtml(v)}`;
+}
+
+// ---- 磯割（data/isowari.json の島だけ）：その日の渡船ごとの磯と、7日ぶんの磯・昼の波・風 ----
+// その日の昼（5〜15時）の、予報をならした値のいちばん大きいもの
+function dayTop(h, keys, i) {
+  if (!h) return null;
+  let top = null;
+  for (let t = 5; t <= 15; t++) {
+    const vals = keys.map(k => h[k]?.[i * 24 + t]).filter(x => x != null);
+    if (vals.length) top = Math.max(top ?? -Infinity, avg(vals));
+  }
+  return top;
+}
+function isoHtml(v) {
+  const isl = islandFor(state.place);
+  if (!isl) return "";
+  const d = state.data, mine = myFerry(isl), ferries = ferriesOf(isl);
+  const today = isoOn(isl, v.day.ymd);
+  const until = isoUntil(isl);
+  const untilText = until ? `${Number(until.slice(5, 7))}月${Number(until.slice(8))}日` : "";
+  const mineOn = list => mine && list?.find(x => x.ferry === mine);
+  const short = g => g.split("・")[0];
+  const head = !today ? `<p class="muted small iso-none">${v.day.short}の磯割は、まだ発表されていません（${untilText}まで）。</p>`
+    : mineOn(today) ? `<p class="iso-big"><span class="sub">${esc(mine)}</span><strong>${esc(mineOn(today).group)}</strong></p>`
+      : `<dl class="iso-list">${today.map(x => `<dt>${esc(x.ferry)}</dt><dd>${esc(x.group)}</dd>`).join("")}</dl>`;
+  const rows = Array.from({ length: DAYS }, (_, i) => {
+    const day = dayLabel(i), iso = isoOn(isl, day.ymd);
+    return { i, day, iso,
+      wave: dayTop(d.waves?.hourly, WAVE_MODELS.map(k => `wave_height_${k}`), i),
+      wind: dayTop(d.wind?.hourly, WIND_MODELS.map(k => `wind_speed_10m_${k}`), i) };
+  });
+  const cols = mine ? [mine] : ferries;
+  const cell = (r, f) => { const x = r.iso?.find(y => y.ferry === f); return x ? esc(mine ? x.group : short(x.group)) : "—"; };
+  // qcheck-ok: W1 島のデータ（このリポジトリの data/isowari.json）は esc する
+  return `<div class="iso" id="iso">
+    <h3 class="iso-title">${icon("place")}磯割（${esc(isl.name)}）<span class="sub small">${v.day.short}</span></h3>
+    <div class="ls-chips" role="group" aria-label="いつもの渡船">${["", ...ferries].map(f => `<button type="button" class="ls-chip is-small" data-ferry="${esc(f)}" aria-pressed="${(mine || "") === f}">${f ? esc(f) : "すべて"}</button>`).join("")}</div>
+    ${head}
+    <div class="table-wrap"><table class="compact iso-days">
+      <thead><tr><th>日</th>${cols.map(f => `<th>${mine ? "磯" : esc(f.replace("渡船", ""))}</th>`).join("")}<th class="num">波 m</th><th class="num">風 m/s</th></tr></thead>
+      <tbody>${rows.map(r => `<tr data-iso-day="${r.i}" class="${r.i === state.day ? "on" : ""}"><th>${r.i < 2 ? r.day.text.replace(/（.）$/, "") : r.day.text.replace(/（(.)）$/, "$1")}</th>${cols.map(f => `<td>${cell(r, f)}</td>`).join("")}<td class="num">${fmt(r.wave)}</td><td class="num">${fmt(r.wind)}</td></tr>`).join("")}</tbody>
+    </table></div>
+    <p class="muted small iso-note">波と風は、昼（5〜15時）の予報をならした値のいちばん大きいもの。行を押すとその日に。磯割は渡船の発表（${untilText}まで）を、毎日くり返す順番として出しています。当日の磯は渡船屋さんに確かめてください。
+      出どころ：${isl.sources.map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.name)}</a>`).join("・")}</p>
   </div>`;
 }
 
@@ -528,6 +574,18 @@ function init() {
     refreshTide();
   });
   state.hour = tokyoParts().hour;
+  // 磯割：いつもの渡船を選ぶ・表の行でその日に
+  document.getElementById("summary").addEventListener("click", ev => {
+    const f = ev.target.closest("[data-ferry]");
+    if (f) { setMyFerry(islandFor(state.place), f.dataset.ferry || null); render(); return; }
+    const r = ev.target.closest("[data-iso-day]");
+    if (r && Number(r.dataset.isoDay) !== state.day) {
+      state.day = Number(r.dataset.isoDay);
+      state.hour = state.day === 0 ? tokyoParts().hour : 6;
+      refreshTide();
+    }
+  });
+  loadIso().then(render);
   document.querySelectorAll(".seg").forEach(seg => seg.addEventListener("click", ev => {
     const b = ev.target.closest("[data-dir]");
     if (!b || b.dataset.dir === state.windDir) return;

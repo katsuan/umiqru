@@ -9,6 +9,7 @@ import { arrow, dirName, esc, fmt, spread, wxShort } from "./format.js";
 import { diaryDb } from "./diary-db.js";
 import { canCard, oqrnCardUrl, pageUrl } from "./card.js";
 import { atTime, canKeepDay, dayIndex, getDay } from "./daydata.js";
+import { ferriesOf, islandFor, isoOn, myFerry, spotsOf } from "./iso.js";
 import { IN_APP, IS_PHONE, canPrompt, onInstallChange, promptInstall, reasonText, shouldInstall, standalone, stepsHtml } from "./install.js";
 
 // 見た海のようす（1つずつ選ぶ。もう一度押すと外れる）と、したこと（いくつでも）
@@ -181,6 +182,7 @@ function entryHtml(e) {
   const span = `${toHM(startOf(e))}${e.end != null ? `〜${toHM(e.end)}` : ""}`;
   return `<article class="entry" data-id="${esc(e.id)}">
     <div class="entry-head"><strong>${span}</strong><button type="button" class="entry-place" data-open="${esc(e.id)}">${icon("place")}${esc(e.placeTitle || e.place?.name || "")}</button></div>
+    ${e.ferry || e.spot ? `<p class="entry-line">${[e.ferry, e.spot].filter(Boolean).map(esc).join("・")}</p>` : ""}
     ${saw || did ? `<p class="entry-line">${[saw && `見た海：${saw}`, did && `したこと：${did}`].filter(Boolean).join("<br>")}</p>` : ""}
     <ol class="tl-steps">${stepsOf(e).map(stepHtml).join("")}</ol>
     ${e.memo ? `<p class="entry-memo">${esc(e.memo)}</p>` : ""}
@@ -298,6 +300,7 @@ function entryLines(e) {
     s.sst != null && `🌡️ 水温 ${fmt(s.sst)}℃`,
   ].filter(Boolean) : [];
   return [
+    (e.ferry || e.spot) && `🪨 ${[e.ferry, e.spot].filter(Boolean).join("・")}`,
     saw && `👀 ${saw}`,
     (e.did || []).length && `🏖️ ${e.did.join("・")}`,
     ...fish,
@@ -379,6 +382,7 @@ function drawForm() {
       <label class="ls-field"><span class="ls-label">おわり</span><input type="time" class="ls-input" name="end" value="${toInput(e.end)}"></label>
     </div>
     <p class="muted small diary-note" id="diary-snapnote"></p>
+    ${isoField(e)}
     <div class="ls-field"><span class="ls-label">写真・釣果</span>
       <p class="muted small diary-note">写真は撮った時刻で並びます（わからないときは、はじめの時刻）。時刻と魚はあとから直せます。</p>
       <div class="items" id="diary-items"></div>
@@ -398,6 +402,31 @@ function drawForm() {
     </div>`;
   drawAt();
   drawItems();
+  isoAuto();
+}
+// 渡船・磯の欄。磯割のある島（data/isowari.json）なら渡船を選べて、その日の磯が入る。ほかの所は磯・釣り座を書くだけ
+function isoField(e) {
+  const isl = islandFor(e.place || now?.place);
+  const ferry = e.id ? e.ferry || "" : myFerry(isl) || "";
+  const spots = isl ? spotsOf(isl) : [];
+  return `<div class="ls-field"><span class="ls-label">${isl ? "渡船・磯" : "磯・釣り座"}</span>
+    ${isl ? `<div class="ls-chips" role="group" data-chips="ferry">${ferriesOf(isl).map(f => `<button type="button" class="ls-chip is-small" data-chip="${esc(f)}" aria-pressed="${f === ferry}">${esc(f)}</button>`).join("")}</div>` : ""}
+    <input class="ls-input" name="spot" list="diary-spots" placeholder="${isl ? "磯（例：グンカン）" : "例：赤灯台の先・テトラ"}" value="${esc(e.spot || "")}" aria-label="磯">
+    ${spots.length ? `<datalist id="diary-spots">${spots.map(x => `<option value="${esc(x)}">`).join("")}</datalist>` : ""}
+    <p class="muted small diary-note" id="diary-iso-note"></p>
+  </div>`;
+}
+// 選んだ渡船の、その日の磯。磯の欄が空か、前にここで入れたままなら入れなおす
+function isoAuto() {
+  const f = document.getElementById("diary-form"), note = document.getElementById("diary-iso-note");
+  const isl = editing && islandFor(editing.place || now?.place);
+  if (!isl || !note) return;
+  const ferry = f.querySelector('[data-chips="ferry"] [aria-pressed="true"]')?.dataset.chip;
+  const ymd = f.querySelector('[name="ymd"]').value || editing.ymd;
+  const g = ferry && isoOn(isl, ymd)?.find(x => x.ferry === ferry)?.group;
+  note.textContent = !ferry ? "" : g ? `${ymdText(ymd)}の${ferry}は「${g}」（${isl.name}の磯割）。` : "この日の磯割は、まだ発表されていません。";
+  const spot = f.querySelector('[name="spot"]');
+  if (g && (!spot.value || spot.dataset.auto === spot.value)) { spot.value = g; spot.dataset.auto = g; }
 }
 
 // 書いている日記の場所と、その日の予報をいっしょに残せるか
@@ -512,6 +541,8 @@ function readForm() {
   e.saw = {};
   SAW.forEach(s => { const b = f.querySelector(`[data-chips="saw:${s.key}"] [aria-pressed="true"]`); if (b) e.saw[s.key] = b.dataset.chip; });
   e.did = [...f.querySelectorAll('[data-chips="did"] [aria-pressed="true"]')].map(b => b.dataset.chip);
+  e.ferry = f.querySelector('[data-chips="ferry"] [aria-pressed="true"]')?.dataset.chip || "";
+  e.spot = f.querySelector('[name="spot"]')?.value.trim() || "";
   readItems();
 }
 async function save(btn) {
@@ -591,6 +622,7 @@ async function onClick(ev) {
     const on = t.getAttribute("aria-pressed") === "true";
     if (!group.dataset.multi) group.querySelectorAll("[data-chip]").forEach(b => b.setAttribute("aria-pressed", "false"));
     t.setAttribute("aria-pressed", String(!on));
+    if (group.dataset.chips === "ferry") isoAuto();
   } else if ("itemAdd" in d) {
     readForm();
     // 今日なら今の時刻、ほかの日は、はじめの時刻
@@ -664,6 +696,7 @@ async function onChange(ev) {
     const i = dayIndex(editing.ymd);
     if (!editing.id && i >= 0 && i < DAYS) hooks.setView(i, Math.floor(editing.start / 60));
     drawAt();
+    isoAuto();
   } else if (t.matches("[data-import]")) importFile(t);
 }
 document.addEventListener("keydown", ev => {
@@ -673,7 +706,7 @@ document.addEventListener("keydown", ev => {
 });
 
 // ---- 分析用に書き出す（CSV。1行が写真・釣果1つ。ないときは日記1つ。その時刻の潮・風・波つき） ----
-const CSV_HEAD = ["日付", "時刻", "種類", "場所", "緯度", "経度", "はじめ", "おわり", "魚", "匹", "cm", "写真",
+const CSV_HEAD = ["日付", "時刻", "種類", "場所", "緯度", "経度", "渡船", "磯", "はじめ", "おわり", "魚", "匹", "cm", "写真",
   "したこと", "見た波", "見た風", "見た水", "月齢", "潮", "潮位差m", "潮位cm", "潮位の高さ%", "上げ下げ", "潮の分", "満潮から分", "まづめ", "夜",
   "波m", "波の予報の低い値", "波の予報の高い値", "周期s", "波の向き", "風m/s", "風の予報の低い値", "風の予報の高い値", "風向", "風向°", "突風m/s",
   "天気", "気温", "降水確率%", "雨mm", "水温", "沖の流れkn", "沖の流れの向き", "あとから読んだ値", "メモ"];
@@ -685,7 +718,7 @@ function csvRows() {
     (list.length ? list : [{ at: startOf(e), diary: true }]).forEach(it => {
       const c = condAt(e, it.at) || {}, t = c.tide || {};
       rows.push([
-        e.ymd, toHM(it.at), it.diary ? "日記" : it.fish ? "釣果" : "写真", e.placeTitle || e.place?.name || "", n(e.place?.lat, 4), n(e.place?.lon, 4),
+        e.ymd, toHM(it.at), it.diary ? "日記" : it.fish ? "釣果" : "写真", e.placeTitle || e.place?.name || "", n(e.place?.lat, 4), n(e.place?.lon, 4), e.ferry || "", e.spot || "",
         toHM(startOf(e)), e.end != null ? toHM(e.end) : "", it.fish || "", it.count || "", it.size || "", it.photo ? 1 : 0,
         (e.did || []).join("・"), e.saw?.wave || "", e.saw?.wind || "", e.saw?.water || "",
         t.age ?? "", t.moon || "", (t.diff || "").replace(/[^\d.]/g, ""), n(t.cm, 0), t.pct ?? "", t.phase || "", t.stage ?? "", t.fromHigh ?? "", c.inMazume || "", c.night == null ? "" : c.night ? 1 : 0,
