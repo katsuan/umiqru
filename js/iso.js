@@ -25,6 +25,10 @@ export function isoOn(island, ymd) {
   const k = daysBetween(p.anchor, ymd), ex = island.except?.[ymd] || {};
   return p.ferries.map(f => ({ ferry: f.name, group: ex[f.name] || p.groups[mod(k + f.shift, p.groups.length)] }));
 }
+// 渡船の船の色（data/isowari.json の color。なければ null）
+export const ferryColor = (island, name) => (island?.periods || []).flatMap(p => p.ferries).find(f => f.name === name)?.color || null;
+// 色をつける style（--ferry に船の色）。色がなければ空
+export const ferryStyle = (island, name) => { const c = ferryColor(island, name); return c && /^#[0-9a-f]{3,8}$/i.test(c) ? ` style="--ferry:${c}"` : ""; };
 // その島の渡船の名前と、磯の名前（まとまりを分けたもの。日記の候補）
 export const ferriesOf = island => [...new Set((island?.periods || []).flatMap(p => p.ferries.map(f => f.name)))];
 export const spotsOf = island => [...new Set((island?.periods || []).flatMap(p => p.groups.flatMap(g => g.split("・"))))];

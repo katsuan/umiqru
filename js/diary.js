@@ -9,7 +9,7 @@ import { arrow, dirName, esc, fmt, spread, wxShort } from "./format.js";
 import { diaryDb } from "./diary-db.js";
 import { canCard, oqrnCardUrl, pageUrl } from "./card.js";
 import { atTime, canKeepDay, dayIndex, getDay } from "./daydata.js";
-import { ferriesOf, islandFor, isoOn, myFerry, spotsOf } from "./iso.js";
+import { ferriesOf, ferryStyle, islandFor, isoOn, myFerry, spotsOf } from "./iso.js";
 import { IN_APP, IS_PHONE, canPrompt, onInstallChange, promptInstall, reasonText, shouldInstall, standalone, stepsHtml } from "./install.js";
 
 // 見た海のようす（1つずつ選ぶ。もう一度押すと外れる）と、したこと（いくつでも）
@@ -410,7 +410,7 @@ function isoField(e) {
   const ferry = e.id ? e.ferry || "" : myFerry(isl) || "";
   const spots = isl ? spotsOf(isl) : [];
   return `<div class="ls-field"><span class="ls-label">${isl ? "渡船・磯" : "磯・釣り座"}</span>
-    ${isl ? `<div class="ls-chips" role="group" data-chips="ferry">${ferriesOf(isl).map(f => `<button type="button" class="ls-chip is-small" data-chip="${esc(f)}" aria-pressed="${f === ferry}">${esc(f)}</button>`).join("")}</div>` : ""}
+    ${isl ? `<div class="ls-chips" role="group" data-chips="ferry">${ferriesOf(isl).map(f => `<button type="button" class="ls-chip is-small" data-chip="${esc(f)}" aria-pressed="${f === ferry}"><i class="ferry-dot"${ferryStyle(isl, f)}></i>${esc(f)}</button>`).join("")}</div>` : ""}
     <input class="ls-input" name="spot" list="diary-spots" placeholder="${isl ? "磯（例：グンカン）" : "例：赤灯台の先・テトラ"}" value="${esc(e.spot || "")}" aria-label="磯">
     ${spots.length ? `<datalist id="diary-spots">${spots.map(x => `<option value="${esc(x)}">`).join("")}</datalist>` : ""}
     <p class="muted small diary-note" id="diary-iso-note"></p>

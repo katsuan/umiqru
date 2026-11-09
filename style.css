@@ -378,3 +378,9 @@ table.iso-days tbody tr.on { background: var(--band); }
 table.iso-days tbody tr.on th, table.iso-days tbody tr.on td { font-weight: 700; }
 .iso-note { margin: 0; }
 .iso-note a { color: inherit; }
+/* 渡船の船の色（家中 黄・家本 紫・高見 緑）。丸と、うすく塗ったマス。色は背景にまぜて、夜の画面でもまぶしくしない */
+.ferry-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--ferry, var(--line)); margin-right: 4px; vertical-align: 0; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15); }
+table.iso-days .is-ferry { background: color-mix(in srgb, var(--ferry) 28%, var(--surface)); padding-left: 6px; }
+table.iso-days thead .is-ferry { background: color-mix(in srgb, var(--ferry) 45%, var(--surface)); }
+table.iso-days tbody tr.on .is-ferry { background: color-mix(in srgb, var(--ferry) 50%, var(--surface)); }
+.iso-big.is-ferry { border-left: 6px solid var(--ferry); padding-left: 12px; }
