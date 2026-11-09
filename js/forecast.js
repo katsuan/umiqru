@@ -7,12 +7,14 @@ import { km } from "./place.js";
 import { jmaPops, jmaText, loadAmedas } from "./jma.js";
 
 // 届いたものから順に state.data に入れて描き直す
-export async function loadForecasts(place, ctxP, onPart) {
-  const q = `latitude=${place.lat}&longitude=${place.lon}&timezone=${encodeURIComponent(TZ)}&forecast_days=${DAYS}`;
+// opt.ymd … その1日だけ（日記に残すとき。前の日は、あとから読んだ値になる）。そのときは気象庁の「いま」のもの（文・警報・アメダス）は読まない
+export async function loadForecasts(place, ctxP, onPart, opt = {}) {
+  const span = opt.ymd ? `start_date=${opt.ymd}&end_date=${opt.ymd}` : `forecast_days=${DAYS}`;
+  const q = `latitude=${place.lat}&longitude=${place.lon}&timezone=${encodeURIComponent(TZ)}&${span}`;
   // 突風（wind_gusts_10m）は GFS・IFS だけが出す（気象庁の MSM・GSM は空）
   const windUrl = (models, gust = false) => `https://api.open-meteo.com/v1/forecast?${q}&hourly=wind_speed_10m,wind_direction_10m,precipitation${gust ? ",wind_gusts_10m" : ""}&wind_speed_unit=ms&models=${models.join(",")}`;
   // done … 届いた（読めなかったものも）出どころ。まだ届いていないグラフは「読みこみ中」と出すため
-  const out = { errors: [], done: [], text: {}, pops: [], wind: { hourly: {} } };
+  const out = { span, errors: [], done: [], text: {}, pops: [], wind: { hourly: {} } };
   const finish = key => { out.done.push(key); onPart(out); };
   const part = (key, p, use, later = false) => p.then(v => { use(v); if (later) onPart(out); else finish(key); }, () => { out.errors.push(key); finish(key); });
   const jobs = [
@@ -25,7 +27,7 @@ export async function loadForecasts(place, ctxP, onPart) {
     part("wx", getJSON(`https://api.open-meteo.com/v1/forecast?${q}&hourly=weather_code,temperature_2m,precipitation_probability,precipitation&daily=sunrise,sunset`), v => { out.wx = v; }),
   ];
   const ctx = await ctxP;
-  if (ctx.jma) {
+  if (ctx.jma && !opt.ymd) {
     jobs.push(part("jma", getJSON(`https://www.jma.go.jp/bosai/forecast/data/forecast/${ctx.jma.office}.json`), v => {
       out.jma = v; out.text = jmaText(v, ctx.jma.c10); out.pops = jmaPops(v, ctx.jma.c10);
     }));
@@ -49,7 +51,7 @@ export async function fillOffshore(place, out) {
   const vars = ["wave_height", "wave_period", "wave_direction", "swell_wave_height"];
   try {
     const res = await getJSON(`https://marine-api.open-meteo.com/v1/marine?latitude=${pts.map(p => p.lat).join(",")}&longitude=${pts.map(p => p.lon).join(",")}`
-      + `&timezone=${encodeURIComponent(TZ)}&forecast_days=${DAYS}&cell_selection=sea&hourly=${vars.join(",")}&models=${empty.join(",")}`);
+      + `&timezone=${encodeURIComponent(TZ)}&${out.span || `forecast_days=${DAYS}`}&cell_selection=sea&hourly=${vars.join(",")}&models=${empty.join(",")}`);
     const list = Array.isArray(res) ? res : [res];
     empty.forEach(k => {
       // 1つだけ頼んだときは、名前に予報の名前が付かない

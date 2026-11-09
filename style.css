@@ -263,17 +263,19 @@ a.fact:focus-visible, a.mini:focus-visible { outline: 2px solid var(--text-2); o
 select.ls-input { appearance: none; -webkit-appearance: none; color: var(--text); }
 .saw-row { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 8px; align-items: center; }
 .saw-key { font-size: 13px; color: var(--text-2); }
-.fish-rows { display: grid; gap: 8px; }
-.fish-row { display: grid; grid-template-columns: minmax(0, 1fr) 64px 64px 40px; gap: 8px; }
-.fish-row .ls-input { padding-inline: 8px; }
-.ls-field > .ls-button { justify-self: start; }
-.pic-add { justify-self: start; cursor: pointer; }
-.pic-add[hidden] { display: none; }
-.entry-pics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-.entry-pics:empty { display: none; }
-.entry-pics img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; background: var(--band); }
-.pic { position: relative; }
-.pic-del { position: absolute; top: 4px; right: 4px; width: 32px; height: 32px; min-height: 0; padding: 0; background: var(--surface); border-radius: 50%; }
+/* 写真・釣果を書く欄：写真 | 時刻・魚・匹・cm | 外す */
+.items { display: grid; gap: 8px; }
+.items:empty { display: none; }
+.item { display: grid; grid-template-columns: 64px minmax(0, 1fr) 40px; gap: 8px; align-items: start; }
+.item-pic { width: 64px; height: 64px; border-radius: 8px; background: var(--band); display: grid; place-items: center; color: var(--text-3); overflow: hidden; }
+.item-pic img { width: 100%; height: 100%; object-fit: cover; }
+.item-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.item-fields .ls-input { padding-inline: 8px; min-width: 0; }
+.item-add { display: flex; flex-wrap: wrap; gap: 8px; }
+.item-add label.ls-button { cursor: pointer; }
+/* iPhone で日付・時刻の欄がずれないように */
+#sec-diary input[type="date"], #sec-diary input[type="time"] { appearance: none; -webkit-appearance: none; width: 100%; min-width: 0; text-align: left; }
+#sec-diary input[type="time"]::-webkit-date-and-time-value, #sec-diary input[type="date"]::-webkit-date-and-time-value { text-align: left; }
 .diary-actions { margin-top: 8px; }
 
 /* カレンダー */
@@ -295,12 +297,38 @@ select.ls-input { appearance: none; -webkit-appearance: none; color: var(--text)
 .entry-place { display: inline-flex; align-items: center; gap: 4px; font: inherit; font-size: 14px; color: var(--text-2); background: none; border: none; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line); }
 .entry-line, .entry-memo { margin: 0; font-size: 14px; }
 .entry-memo { white-space: pre-wrap; }
-.entry-fish { margin: 0; padding-left: 24px; font-size: 14px; }
-.entry-snap { font-size: 13px; color: var(--text-2); }
-.entry-snap summary { cursor: pointer; color: var(--text-3); }
-.entry-snap dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 16px; margin: 8px 0 0; }
-.entry-snap dt { color: var(--text-3); white-space: nowrap; }
-.entry-snap dd { margin: 0; }
+/* 日記の並び：はじめ → 写真・釣果 → おわり（左の線と点） */
+.tl-steps { list-style: none; margin: 0; padding: 0; display: grid; }
+.tl-step { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 8px; position: relative; }
+.tl-step::before { content: ""; position: absolute; left: 15px; top: 0; bottom: 0; border-left: 2px solid var(--grid); }
+.tl-step:first-child::before { top: 16px; }
+.tl-step:last-child::before { bottom: calc(100% - 16px); }
+.tl-dot { position: relative; z-index: 1; width: 32px; height: 32px; margin-top: 4px; border-radius: 50%; background: var(--surface); border: 2px solid var(--line); display: grid; place-items: center; color: var(--text-2); }
+.tl-step.is-start .tl-dot, .tl-step.is-end .tl-dot { width: 16px; height: 16px; margin: 12px 8px 0; }
+.tl-step.is-item .tl-dot { border-color: var(--text-2); }
+.tl-body { display: grid; gap: 4px; justify-items: start; text-align: left; font: inherit; color: var(--text); background: none; border: none; padding: 8px 0; cursor: pointer; }
+.tl-line { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: 14px; }
+.tl-time { font-variant-numeric: tabular-nums; font-weight: 700; }
+.tl-pic { width: 160px; max-width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; background: var(--band); }
+.tl-cond { font-size: 12px; color: var(--text-2); }
+@media (hover: hover) { .tl-body:hover .tl-time { text-decoration: underline; } }
+#diary-day > *, .entry > * { min-width: 0; }
+.day-table { overflow-x: auto; max-width: 100%; }
+.day-table table.tl td { cursor: default; }
+.day-table th .ls-icon { display: block; margin: 0 auto 2px; }
+dl.cond { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 16px; margin: 8px 0 0; font-size: 13px; }
+dl.cond dt { color: var(--text-3); white-space: nowrap; }
+dl.cond dd { margin: 0; }
+/* 写真を大きく見る窓 */
+dialog.viewer { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--text); }
+dialog.viewer::backdrop { background: rgba(0, 0, 0, 0.6); }
+.viewer-in { display: grid; gap: 8px; padding: 16px; }
+.viewer-bar { display: grid; grid-template-columns: minmax(0, 1fr) 40px; gap: 8px; align-items: start; }
+.viewer-pic { display: block; width: 100%; max-height: 60dvh; object-fit: contain; border-radius: 8px; background: var(--band); }
+.viewer-title { margin: 0; font-weight: 700; }
+.viewer-nav { margin-top: 8px; }
+.diary-where { margin-bottom: 16px; }
+.diary-where a { color: inherit; }
 .entry-actions { display: flex; gap: 8px; }
 .entry-actions .ls-button { min-height: 32px; font-size: 13px; padding: 0 16px; }
 

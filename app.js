@@ -12,6 +12,7 @@ import { arrow, baseName, dirName, esc, fmt, meanDir, spread, rainCell, rainMmCe
 import { dashSwatch, drawChart, legend, timeline, tlScroll } from "./js/chart.js";
 import { diaryNow, drawDiary, drawDiaryShell, initDiary } from "./js/diary.js";
 import { canCard, oqrnCardUrl, pageUrl } from "./js/card.js";
+import { mazume } from "./js/daydata.js";
 
 // ---- 線 ----
 function windSeries(d) {
@@ -43,15 +44,6 @@ function waveSeries(d) {
   }));
 }
 const avg = a => a.reduce((s, v) => s + v, 0) / (a.length || 1);
-// まづめ：薄明のはじまり〜日の出の1時間後、日の入りの1時間前〜薄明のおわり（めやす）
-function mazume(tide) {
-  if (!tide?.sun) return null;
-  const s = tide.sun;
-  const rise = hm(s.rise), set = hm(s.set);
-  const [tw0, tw1] = (s.regular_twilight || []).map(hm);
-  return { rise, set, morning: [tw0 ?? rise - 0.5, rise + 1], evening: [set - 1, tw1 ?? set + 0.5] };
-}
-
 // 3時間ごとに、予報を横に並べる表
 
 // 向き（波・風）：16方位（北北西）か角度（331°）。波と風の欄のボタンで、どちらもいっしょに切りかえる
@@ -321,22 +313,13 @@ function cardUrl(v) {
   });
 }
 
-// 日記に残す、いま見ている場所・日時と、その時刻の予報・潮・観測
+// 日記に渡す、いま見ている場所・日時（日記はこの場所で書き、その日1日ぶんの予報・潮・観測を残す）
 function diaryContext(v) {
-  const p = state.place, { tide, mz } = v;
+  const p = state.place;
   return {
     day: v.day, h: v.h,
     place: { name: p.alts ? baseName(p.name) : p.name, lat: p.lat, lon: p.lon, pinned: true },
     placeTitle: placeTitle(),
-    snap: {
-      tide: tide ? { moon: tide.moon.title, diff: v.tideDiff, port: state.ctx.port?.name, events: tideEvents(tide, hm).map(t => `${t.k} ${t.time}`).join("・") } : null,
-      mazume: mz ? `朝 ${hmText(mz.morning[0])}〜${hmText(mz.morning[1])}・夕 ${hmText(mz.evening[0])}〜${hmText(mz.evening[1])}` : null,
-      wave: v.wr, waveJma: v.text?.wave || null,
-      wind: v.wind, windDir: v.windDir ?? null, gust: v.gustMax,
-      sst: v.sst ?? null, cur: v.cur,
-      wx: v.code != null ? wxName(v.code) : null, rain: v.rain ?? null, temp: v.temp ?? null,
-      amedas: v.amedas ? { name: v.amedas.name, time: v.amedas.time, wind: v.amedas.wind, dir: v.amedas.dir, temp: v.amedas.temp } : null,
-    },
   };
 }
 

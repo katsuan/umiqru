@@ -1,12 +1,14 @@
-// うみくる：海の日記（日記タブ）。見た海のようす・したこと・釣果・写真に、その日時の予報・潮・観測をそえて、この端末に残す。月のカレンダーで見る
+// うみくる：海の日記（日記タブ）。見た海のようす・したこと・メモと、時刻つきの写真・釣果に、その日1日ぶんの予報・潮・観測をそえて、この端末に残す
+// 日記は「はじめ → 写真・釣果（時刻の順）→ おわり」に並べ、それぞれの時刻の潮位・風・波を出す。写真を押すと、大きな写真とその時刻の値。月のカレンダーで見る
 // 読まれるところ：app.js（initDiary・diaryNow）
 import { NAMES } from "./names.js";
 import { DAYS } from "./sources.js";
 import { store } from "./store.js";
 import { WEEK, addDays, tokyoParts } from "./time.js";
-import { dirName, esc, fmt, spread } from "./format.js";
+import { arrow, dirName, esc, fmt, spread, wxShort } from "./format.js";
 import { diaryDb } from "./diary-db.js";
 import { canCard, oqrnCardUrl, pageUrl } from "./card.js";
+import { atTime, canKeepDay, dayIndex, getDay } from "./daydata.js";
 
 // 見た海のようす（1つずつ選ぶ。もう一度押すと外れる）と、したこと（いくつでも）
 const SAW = [
@@ -15,19 +17,29 @@ const SAW = [
   { key: "water", label: "水", opts: ["澄み", "少し濁り", "濁り"] },
 ];
 const DID = ["釣り", "サーフィン", "磯あそび", "散歩", "ほか"];
-const MAX_PHOTOS = 4;
 const PHOTO_PX = 1600; // 写真は長い辺をここまで小さくして残す
 const EXPORT_TAG = "umiqru-diary";
 
-// app.js が入れるもの：いま見ている場所・日時と、その時刻の予報（render のたびに）、ページを動かす関数
+// どこで開いているか（日記はブラウザごとに別の場所に残るので、注意を出す）
+const UA = navigator.userAgent;
+const IN_LINE = /\bLine\//i.test(UA);
+const IN_APP = IN_LINE || /FBAN|FBAV|Instagram|Twitter/i.test(UA);
+const IS_IOS = /iPhone|iPad|iPod/.test(UA) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const IS_PHONE = IS_IOS || /Android/.test(UA);
+const STANDALONE = navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
+
+// app.js が入れるもの：いま見ている場所・日時（render のたびに）、ページを動かす関数
 let now = null;
 let hooks = { setView: () => {}, openPlace: () => {} };
 let entries = [];
 let month = null; // 見ている月 "2026-11"
 let selected = null; // えらんだ日 "2026-11-08"
 let editing = null; // 書いている日記（新しいものは id なし）
-let pending = []; // 書いている日記の写真 { id, buf, type, url, saved }
+let editYmd = null; // なおす前の日にち（変えたら、その日の予報を読みなおす）
+let items = []; // 書いている日記の写真・釣果 { id, at, photo, fish, count, size }
+let fresh = new Map(); // まだ残していない写真の id → { type, buf }
 let dropped = []; // 書いている日記から外した、残してあった写真の id
+let viewing = null; // 写真を大きく見ているとき { e, steps, i }
 const urls = new Map(); // 写真の id → 画面に出す URL
 const records = new Map(); // 写真の id → { type, buf }（共有するとき、押してすぐ写真を渡せるように）
 
@@ -39,9 +51,25 @@ const ymdText = ymd => {
   const [y, m, d] = ymd.split("-").map(Number);
   return `${m}月${d}日（${WEEK[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]}）`;
 };
-// 今日から何日目か（予報を読んである日なら 0〜DAYS-1）
-const dayIndex = ymd => Math.round((Date.parse(`${ymd}T00:00:00Z`) - Date.parse(`${today()}T00:00:00Z`)) / 864e5);
+// 時刻は 0:00 からの分で持つ。"5:30" と分の行き来
+const toHM = min => `${Math.floor(min / 60)}:${String(Math.round(min % 60)).padStart(2, "0")}`;
+const toInput = min => min == null ? "" : `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(Math.round(min % 60)).padStart(2, "0")}`;
+const fromHM = s => { const m = /^(\d{1,2}):(\d{2})/.exec(s || ""); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
 const weekStart = () => window.QWeekStart ? window.QWeekStart.get(store.get("umiqru:weekStart")) : (store.get("umiqru:weekStart") ?? 1);
+
+// ---- 日記の形（前の形：hour・catches・photos・snap も読めるように） ----
+const startOf = e => e.start ?? e.hour * 60;
+function itemsOf(e) {
+  if (e.items) return e.items;
+  const at = startOf(e);
+  return [
+    ...(e.photos || []).map(photo => ({ id: photo, at, photo })),
+    ...(e.catches || []).map((c, i) => ({ id: `${e.id}-c${i}`, at, ...c })),
+  ];
+}
+// その時刻の値。1日ぶんを残してあればそこから。前の形は書いた時刻のぶんだけ
+const condAt = (e, min) => e.day ? atTime(e.day, min) : e.snap && min === startOf(e) ? e.snap : null;
+const fishText = it => it.fish ? `${it.fish}${it.count ? ` ${it.count}匹` : ""}${it.size ? ` ${it.size}cm` : ""}` : "";
 
 // ---- app.js から ----
 export function initDiary(h) {
@@ -52,10 +80,10 @@ export function initDiary(h) {
   box().addEventListener("change", onChange);
   load();
 }
-// render のたびに：いま見ている場所・日時と、その時刻の予報・観測。書いている途中なら、見出しと注を書きかえる
+// render のたびに：いま見ている場所・日時
 export function diaryNow(v) {
   now = v;
-  // 場所と予報を読むまでは書けない（書く日記の場所がないので）
+  // 場所を読むまでは書けない（書く日記の場所がないので）
   const btn = document.getElementById("diary-new");
   if (btn) btn.disabled = false;
   if (editing && !editing.id) drawAt();
@@ -105,7 +133,7 @@ function drawCalendar() {
 function groupByDay() {
   const out = {};
   entries.forEach(e => { (out[e.ymd] ||= []).push(e); });
-  Object.values(out).forEach(l => l.sort((a, b) => a.hour - b.hour));
+  Object.values(out).forEach(l => l.sort((a, b) => startOf(a) - startOf(b)));
   return out;
 }
 
@@ -118,18 +146,49 @@ function drawDay() {
   el.innerHTML = `<h3 class="diary-day-title">${ymdText(selected)}</h3>
     ${list.length ? list.map(entryHtml).join("") : `<p class="muted small" style="margin:0">この日の日記はありません。</p>`}`;
   fillPhotos(el);
+  // 1日の表は、はじめの時刻のあたりから見えるように
+  el.querySelectorAll(".day-table").forEach(w => { w.scrollLeft = Math.max(0, Number(w.dataset.from) - 1) * 40; });
+}
+// 潮・風・波を1行で（並びの中に出す）
+function condShort(c) {
+  if (!c) return "";
+  const t = c.tide;
+  return [
+    t && (t.stageText || t.cm != null ? `潮 ${t.stageText ? `${t.stageText} ` : ""}${t.cm != null ? `${Math.round(t.cm)}cm` : ""}` : t.moon && `潮 ${t.moon}`),
+    c.wind && `風 ${c.windDir != null ? `${dirName(c.windDir)} ` : ""}${fmt(c.windMean ?? c.wind.hi)}m/s`,
+    c.wave && `波 ${fmt(c.waveMean ?? c.wave.hi)}m`,
+  ].filter(Boolean).map(esc).join("・");
+}
+// はじめ → 写真・釣果（時刻の順）→ おわり
+function stepsOf(e) {
+  const list = [...itemsOf(e)].sort((a, b) => a.at - b.at);
+  return [
+    { kind: "start", at: startOf(e) },
+    ...list.map(it => ({ kind: "item", at: it.at, it })),
+    ...(e.end != null ? [{ kind: "end", at: e.end }] : []),
+  ];
 }
 function entryHtml(e) {
   const saw = SAW.map(s => e.saw?.[s.key] ? `${s.label} ${esc(e.saw[s.key])}` : "").filter(Boolean).join("・");
   const did = (e.did || []).map(esc).join("・");
-  const fish = (e.catches || []).filter(c => c.fish).map(c => `<li>${esc(c.fish)}${c.count ? ` ${esc(c.count)}匹` : ""}${c.size ? ` ${esc(c.size)}cm` : ""}</li>`).join("");
+  const stepHtml = (st, i) => {
+    const cond = condShort(condAt(e, st.at));
+    const head = st.kind === "start" ? "はじめ" : st.kind === "end" ? "おわり" : esc(fishText(st.it)) || "写真";
+    const pic = st.it?.photo ? `<img class="tl-pic" data-photo="${esc(st.it.photo)}" alt="${toHM(st.at)}の写真">` : "";
+    return `<li class="tl-step is-${st.kind}">
+      <span class="tl-dot">${st.kind === "item" ? icon(st.it.photo ? "camera" : "target") : ""}</span>
+      <button type="button" class="tl-body" data-view="${esc(e.id)}" data-step="${i}">
+        <span class="tl-line"><span class="tl-time">${toHM(st.at)}</span><span class="tl-head">${head}</span></span>
+        ${pic}${cond ? `<span class="tl-cond">${cond}</span>` : ""}
+      </button></li>`;
+  };
+  const span = `${toHM(startOf(e))}${e.end != null ? `〜${toHM(e.end)}` : ""}`;
   return `<article class="entry" data-id="${esc(e.id)}">
-    <div class="entry-head"><strong>${e.hour}時</strong><button type="button" class="entry-place" data-open="${esc(e.id)}">${icon("place")}${esc(e.placeTitle || e.place?.name || "")}</button></div>
-    ${(e.photos || []).length ? `<div class="entry-pics">${e.photos.map(id => `<a data-photo-link="${esc(id)}" target="_blank" rel="noopener"><img data-photo="${esc(id)}" alt="写真"></a>`).join("")}</div>` : ""}
+    <div class="entry-head"><strong>${span}</strong><button type="button" class="entry-place" data-open="${esc(e.id)}">${icon("place")}${esc(e.placeTitle || e.place?.name || "")}</button></div>
     ${saw || did ? `<p class="entry-line">${[saw && `見た海：${saw}`, did && `したこと：${did}`].filter(Boolean).join("<br>")}</p>` : ""}
-    ${fish ? `<ul class="entry-fish">${fish}</ul>` : ""}
+    <ol class="tl-steps">${stepsOf(e).map(stepHtml).join("")}</ol>
     ${e.memo ? `<p class="entry-memo">${esc(e.memo)}</p>` : ""}
-    ${snapHtml(e)}
+    ${e.day ? dayTable(e) : snapHtml(e)}
     <div class="share-row entry-send">
       ${canCard() ? `<a class="ls-button line is-oqrn" href="${esc(cardUrl(e))}">カードでおくるん</a>` : ""}
       <button type="button" class="ls-button" data-share="${esc(e.id)}">${icon(navigator.share ? "share" : "copy")}${navigator.share ? "共有" : "文をコピー"}</button>
@@ -140,51 +199,120 @@ function entryHtml(e) {
     </div>
   </article>`;
 }
-// そのときの予報・潮・観測（書いたときに残したもの）
-function snapHtml(e) {
-  const s = e.snap;
-  if (!s) return "";
-  const rows = [
-    s.tide && ["潮", `${esc(s.tide.moon)}${s.tide.diff ? `・${esc(s.tide.diff)}` : ""}${s.tide.port ? `（${esc(s.tide.port)}）` : ""}${s.tide.events ? `<br>${esc(s.tide.events)}` : ""}`],
-    s.mazume && ["まづめ", esc(s.mazume)],
-    s.wave && ["波", `${spread(s.wave)} m（${s.wave.n}つの予報）${s.waveJma ? `<br>${NAMES.jma}：${esc(s.waveJma)}` : ""}`],
-    s.wind && ["風", `${s.windDir != null ? `${dirName(s.windDir)} ` : ""}${spread(s.wind)} m/s${s.gust != null ? `・突風 ${fmt(s.gust, 0)}` : ""}`],
-    (s.wx || s.temp != null) && ["天気", [s.wx && esc(s.wx), s.temp != null && `${fmt(s.temp, 0)}℃`, s.rain != null && `降水確率 ${s.rain}%`].filter(Boolean).join("・")],
-    s.sst != null && ["水温", `${fmt(s.sst)}℃${s.cur ? `・沖の流れ ${s.cur.dir != null ? `${dirName(s.cur.dir)}へ ` : ""}${fmt(s.cur.kn)}ノット` : ""}`],
-    s.amedas && ["実況", `${NAMES.amedas} ${esc(s.amedas.name)}（${esc(s.amedas.time)}）${s.amedas.wind != null ? ` ${s.amedas.dir != null ? `${dirName(s.amedas.dir)} ` : ""}${fmt(s.amedas.wind)} m/s` : ""}${s.amedas.temp != null ? `・${fmt(s.amedas.temp)}℃` : ""}`],
+// その時刻の予報・潮・観測を、見出しと値の並びに
+function condRows(c) {
+  if (!c) return [];
+  const t = c.tide;
+  return [
+    t && ["潮", [
+      t.cm != null && `${Math.round(t.cm)}cm${t.pct != null ? `（この日の高さの ${t.pct}%）` : ""}`,
+      t.stageText && esc(t.stageText),
+    ].filter(Boolean).join("・") + `<br>${esc(t.moon)}${t.diff ? `・${esc(t.diff)}` : ""}${t.port ? `（${esc(t.port)}）` : ""}${t.events ? `<br>${esc(t.events)}` : ""}`],
+    c.mazume && ["まづめ", `${c.inMazume ? `<strong>${esc(c.inMazume)}</strong>・` : ""}${esc(c.mazume)}`],
+    c.wave && ["波", `${spread(c.wave)} m（${c.wave.n}つの予報）${c.period ? `・周期 ${fmt(c.period, 0)}秒` : ""}${c.waveDir != null ? `・${dirName(c.waveDir)}から` : ""}${c.waveJma ? `<br>${NAMES.jma}：${esc(c.waveJma)}` : ""}`],
+    c.wind && ["風", `${c.windDir != null ? `${dirName(c.windDir)} ` : ""}${spread(c.wind)} m/s${c.gust != null ? `・突風 ${fmt(c.gust, 0)}` : ""}`],
+    (c.wx || c.temp != null) && ["天気", [c.wx && esc(c.wx), c.temp != null && `${fmt(c.temp, 0)}℃`, c.rain != null && `降水確率 ${c.rain}%`].filter(Boolean).join("・")],
+    c.sst != null && ["水温", `${fmt(c.sst)}℃${c.cur ? `・沖の流れ ${c.cur.dir != null ? `${dirName(c.cur.dir)}へ ` : ""}${fmt(c.cur.kn)}ノット` : ""}`],
+    c.amedas && ["実況", `${NAMES.amedas} ${esc(c.amedas.name)}（${esc(c.amedas.time)}）${c.amedas.wind != null ? ` ${c.amedas.dir != null ? `${dirName(c.amedas.dir)} ` : ""}${fmt(c.amedas.wind)} m/s` : ""}${c.amedas.temp != null ? `・${fmt(c.amedas.temp)}℃` : ""}`],
   ].filter(Boolean);
-  return rows.length ? `<details class="entry-snap"><summary>${e.hour}時の予報と観測</summary>
-    <dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl></details>` : "";
+}
+const rowsHtml = rows => `<dl class="cond">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>`;
+// 前の形の日記：書いた時刻のぶんだけ
+function snapHtml(e) {
+  const rows = condRows(e.snap);
+  return rows.length ? `<details class="entry-snap"><summary>${toHM(startOf(e))}の予報と観測</summary>${rowsHtml(rows)}</details>` : "";
+}
+// 表のマスに入る短い潮の段階：「上6」「下1」、満潮・干潮のころは「満」「干」
+const tideShort = t => !t?.stageText ? "—" : t.stageText.endsWith("ごろ") ? t.stageText[0] : `${t.phase[0]}${t.stage ?? ""}`;
+// その日1日ぶん（1時間ごと）。写真・釣果のある時刻に印、はじめ〜おわりに色
+function dayTable(e) {
+  const marks = new Set(itemsOf(e).map(it => Math.round(it.at / 60)));
+  const from = Math.floor(startOf(e) / 60), to = e.end != null ? Math.ceil(e.end / 60) : from;
+  const hours = Array.from({ length: 24 }, (_, h) => ({ h, c: atTime(e.day, h * 60) }));
+  const cls = h => h >= from && h <= to ? ' class="on"' : "";
+  const row = (label, cell) => `<tr><th class="stick">${label}</th>${hours.map(({ h, c }) => `<td${cls(h)}>${cell(c)}</td>`).join("")}</tr>`;
+  return `<details class="entry-snap"><summary>この日1日の予報と潮${e.day.later ? "（あとから読んだ値）" : ""}</summary>
+    <div class="table-wrap day-table" data-from="${from}"><table class="tl">
+      <thead><tr><th class="stick">時刻</th>${hours.map(({ h }) => `<th${cls(h)}>${marks.has(h) ? icon("camera") : ""}${h}時</th>`).join("")}</tr></thead>
+      <tbody>
+        ${row("潮位 cm", c => c.tide ? Math.round(c.tide.cm) : "—")}
+        ${row("潮", c => tideShort(c.tide))}
+        ${row("波 m", c => c.waveMean != null ? `${arrow(c.waveDir)}${fmt(c.waveMean)}` : "—")}
+        ${row("風 m/s", c => c.windMean != null ? `${arrow(c.windDir)}${fmt(c.windMean)}` : "—")}
+        ${row("天気", c => c.code != null ? esc(wxShort(c.code)) : "—")}
+        ${row("気温", c => c.temp != null ? fmt(c.temp, 0) : "—")}
+      </tbody></table></div>
+    <p class="muted small" style="margin:8px 0 0">潮の「上6」は上げ6分（干潮から満潮までを10に分けて）。${icon("camera")}は写真・釣果のある時刻。波と風は予報をならした値。${e.day.later ? "前の日の値は、あとから読んだもの（そのときの予報とは少しちがうことがあります）。" : ""}</p>
+  </details>`;
+}
+
+// ---- 写真を大きく見る（その時刻の値つき） ----
+function openViewer(e, i) {
+  viewing = { e, steps: stepsOf(e), i };
+  drawViewer();
+  const dlg = document.getElementById("diary-viewer");
+  if (!dlg.open) { if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", ""); }
+}
+function drawViewer() {
+  const { e, steps, i } = viewing;
+  const st = steps[i];
+  const rows = condRows(condAt(e, st.at));
+  const title = st.kind === "start" ? "はじめ" : st.kind === "end" ? "おわり" : fishText(st.it) || "写真";
+  const dlg = document.getElementById("diary-viewer");
+  // qcheck-ok: W1 日記の中身は esc、値は condRows で esc する
+  dlg.innerHTML = `<div class="viewer-in">
+    <div class="viewer-bar">
+      <div><strong>${ymdText(e.ymd)} ${toHM(st.at)}</strong><br><span class="sub small">${esc(e.placeTitle || e.place?.name || "")}</span></div>
+      <button type="button" class="ls-icon-button" data-viewer-close aria-label="閉じる">${icon("close")}</button>
+    </div>
+    ${st.it?.photo ? `<img class="viewer-pic" data-photo="${esc(st.it.photo)}" alt="${toHM(st.at)}の写真">` : ""}
+    <p class="viewer-title">${esc(title)}</p>
+    ${rows.length ? rowsHtml(rows) : `<p class="muted small">この時刻の予報は残っていません。</p>`}
+    ${e.day?.later ? `<p class="muted small">あとから読んだ値です。</p>` : ""}
+    <div class="ls-grid-2 viewer-nav">
+      <button type="button" class="ls-button" data-viewer-go="-1"${i ? "" : " disabled"}>${icon("back")}前</button>
+      <button type="button" class="ls-button" data-viewer-go="1"${i < steps.length - 1 ? "" : " disabled"}>次${icon("next")}</button>
+    </div>
+  </div>`;
+  fillPhotos(dlg);
+}
+function closeViewer() {
+  const dlg = document.getElementById("diary-viewer");
+  if (dlg.open) { if (dlg.close) dlg.close(); else dlg.removeAttribute("open"); }
+  viewing = null;
 }
 
 // ---- 送る（おくるんのカード・端末の共有） ----
 // 日記の場所を開くリンク（場所は書いたときの位置と名前で。ウィジェットの Parameter と同じ書き方）
 const entryUrl = e => pageUrl(`${e.place.lat.toFixed(4)},${e.place.lon.toFixed(4)}=${e.place.name}`);
-// 日記を文に（カードの中身と、共有の文）。forecast … そのときの予報も入れるか
-function entryLines(e, forecast = true) {
+// 日記を文に（カードの中身と、共有の文）。釣果は時刻と潮の段階つき
+function entryLines(e) {
   const saw = SAW.map(s => e.saw?.[s.key] ? `${s.label} ${e.saw[s.key]}` : "").filter(Boolean).join("・");
-  const fish = (e.catches || []).filter(c => c.fish).map(c => `${c.fish}${c.count ? ` ${c.count}匹` : ""}${c.size ? ` ${c.size}cm` : ""}`).join("・");
+  const fish = [...itemsOf(e)].sort((a, b) => a.at - b.at).filter(it => it.fish).map(it => {
+    const t = condAt(e, it.at)?.tide;
+    return `🎣 ${toHM(it.at)} ${fishText(it)}${t?.stageText ? `（${t.stageText}）` : ""}`;
+  });
   const memo = (e.memo || "").length > 200 ? `${e.memo.slice(0, 200)}…` : e.memo;
-  const s = e.snap;
-  const fc = forecast && s ? [
+  const s = condAt(e, startOf(e));
+  const fc = s ? [
+    s.tide && `🌙 ${s.tide.moon}${s.tide.diff ? `・${s.tide.diff}` : ""}`,
     s.wave && `🌊 波 ${spread(s.wave)} m`,
     s.wind && `💨 風 ${s.windDir != null ? `${dirName(s.windDir)} ` : ""}${spread(s.wind)} m/s${s.gust != null ? `（突風 ${fmt(s.gust, 0)}）` : ""}`,
-    s.tide && `🌙 ${s.tide.moon}${s.tide.diff ? `・${s.tide.diff}` : ""}`,
     (s.wx || s.temp != null) && `☁️ ${[s.wx, s.temp != null && `${fmt(s.temp, 0)}℃`].filter(Boolean).join("・")}`,
     s.sst != null && `🌡️ 水温 ${fmt(s.sst)}℃`,
   ].filter(Boolean) : [];
   return [
     saw && `👀 ${saw}`,
     (e.did || []).length && `🏖️ ${e.did.join("・")}`,
-    fish && `🎣 ${fish}`,
+    ...fish,
     memo && `📝 ${memo}`,
-    ...(fc.length ? ["", `${e.hour}時の予報`, ...fc] : []),
+    ...(fc.length ? ["", `${toHM(startOf(e))}の予報`, ...fc] : []),
   ].filter(x => x || x === "");
 }
 function cardUrl(e) {
   return oqrnCardUrl({
     header: `🌊 ${NAMES.app}の日記`,
-    date: `🕒 ${ymdText(e.ymd)} ${e.hour}時`,
+    date: `🕒 ${ymdText(e.ymd)} ${toHM(startOf(e))}${e.end != null ? `〜${toHM(e.end)}` : ""}`,
     title: e.placeTitle || e.place?.name || "",
     detail: entryLines(e).join("\n") || "海の日記",
     actionUrl: entryUrl(e),
@@ -193,7 +321,7 @@ function cardUrl(e) {
 // 端末の共有の画面で、文・リンクと写真をいっしょに（写真を渡せない端末は文とリンクだけ。共有がなければ文をコピー）
 async function shareEntry(e, btn) {
   if (!e) return;
-  const text = [`${ymdText(e.ymd)} ${e.hour}時 ${e.placeTitle || e.place.name}`, ...entryLines(e)].join("\n");
+  const text = [`${ymdText(e.ymd)} ${toHM(startOf(e))} ${e.placeTitle || e.place.name}`, ...entryLines(e)].join("\n");
   const url = entryUrl(e);
   if (!navigator.share) {
     const label = btn.innerHTML;
@@ -210,24 +338,31 @@ async function shareEntry(e, btn) {
 
 // ---- 書く・なおす ----
 function startEdit(e = null) {
-  pending.forEach(p => !p.saved && URL.revokeObjectURL(p.url));
+  forgetFresh();
   dropped = [];
   if (e) {
     editing = structuredClone(e);
-    pending = (e.photos || []).map(id => ({ id, saved: true }));
+    editing.start = startOf(e);
+    items = itemsOf(e).map(it => ({ ...it }));
+    editYmd = e.ymd;
   } else {
     if (!now?.place) return;
-    const ymd = now.day.ymd;
-    editing = { ymd, hour: now.h, saw: {}, did: [], catches: [], memo: "", photos: [] };
-    pending = [];
+    editing = { ymd: now.day.ymd, start: now.h * 60, end: null, saw: {}, did: [], memo: "" };
+    items = [];
+    editYmd = null;
   }
   drawForm();
   drawDay();
   document.getElementById("diary-form").scrollIntoView({ block: "start" });
 }
+// まだ残していない写真を、画面からも外す
+function forgetFresh() {
+  fresh.forEach((_, id) => { URL.revokeObjectURL(urls.get(id)); urls.delete(id); });
+  fresh = new Map();
+}
 function stopEdit() {
-  pending.forEach(p => !p.saved && p.url && URL.revokeObjectURL(p.url));
-  editing = null; pending = []; dropped = [];
+  forgetFresh();
+  editing = null; items = []; dropped = []; editYmd = null;
   const f = document.getElementById("diary-form");
   f.hidden = true; f.innerHTML = "";
   document.getElementById("diary-new").hidden = false;
@@ -242,59 +377,106 @@ function drawForm() {
   // qcheck-ok: W1 決まった選択肢と、esc した入力だけ
   f.innerHTML = `<h3 class="diary-form-title">${e.id ? "日記をなおす" : "日記を書く"}</h3>
     <p class="diary-at" id="diary-at"></p>
+    <label class="ls-field"><span class="ls-label">日にち</span><input type="date" class="ls-input" name="ymd" value="${esc(e.ymd)}" max="${addDays(today(), DAYS - 1)}"></label>
     <div class="ls-grid-2">
-      <label class="ls-field"><span class="ls-label">日にち</span><input type="date" class="ls-input" name="ymd" value="${esc(e.ymd)}" max="${addDays(today(), DAYS - 1)}"></label>
-      <label class="ls-field"><span class="ls-label">時刻</span><select class="ls-input" name="hour">${Array.from({ length: 24 }, (_, h) => `<option value="${h}"${h === e.hour ? " selected" : ""}>${h}時</option>`).join("")}</select></label>
+      <label class="ls-field"><span class="ls-label">はじめ</span><input type="time" class="ls-input" name="start" value="${toInput(e.start)}"></label>
+      <label class="ls-field"><span class="ls-label">おわり</span><input type="time" class="ls-input" name="end" value="${toInput(e.end)}"></label>
     </div>
     <p class="muted small diary-note" id="diary-snapnote"></p>
+    <div class="ls-field"><span class="ls-label">写真・釣果</span>
+      <p class="muted small diary-note">写真は撮った時刻で並びます（わからないときは、はじめの時刻）。時刻と魚はあとから直せます。</p>
+      <div class="items" id="diary-items"></div>
+      <div class="item-add">
+        <label class="ls-button">${icon("camera")}写真を足す<input type="file" accept="image/*" multiple class="vh" data-pic-input></label>
+        <button type="button" class="ls-button" data-item-add>${icon("add")}写真なしで魚を足す</button>
+      </div>
+    </div>
     <div class="ls-field"><span class="ls-label">見た海のようす</span>
       ${SAW.map(s => `<div class="saw-row"><span class="saw-key">${s.label}</span>${chips(`saw:${s.key}`, s.opts, e.saw?.[s.key] || "", false)}</div>`).join("")}
     </div>
     <div class="ls-field"><span class="ls-label">したこと</span>${chips("did", DID, e.did || [], true)}</div>
-    <div class="ls-field" id="diary-fish"${(e.did || []).includes("釣り") || (e.catches || []).length ? "" : " hidden"}><span class="ls-label">釣果</span>
-      <div class="fish-rows" id="fish-rows">${(e.catches.length ? e.catches : [{}]).map(fishRow).join("")}</div>
-      <button type="button" class="ls-button" data-fish-add>${icon("add")}魚を足す</button>
-    </div>
     <label class="ls-field"><span class="ls-label">メモ</span><textarea class="ls-input" name="memo" rows="3" placeholder="例：朝まづめに足もとでアジ。10時ごろから北風が強くなった">${esc(e.memo || "")}</textarea></label>
-    <div class="ls-field"><span class="ls-label">写真（${MAX_PHOTOS}枚まで）</span>
-      <div class="entry-pics" id="diary-pics"></div>
-      <label class="ls-button pic-add" id="pic-add">${icon("camera")}写真を足す<input type="file" accept="image/*" multiple class="vh" data-pic-input></label>
-    </div>
     <div class="ls-grid-2 diary-actions">
       <button type="button" class="ls-button" data-cancel>やめる</button>
       <button type="button" class="ls-button is-primary" data-save>${icon("save")}残す</button>
     </div>`;
   drawAt();
-  drawPics();
+  drawItems();
 }
-const fishRow = (c = {}) => `<div class="fish-row">
-  <input class="ls-input" name="fish" placeholder="魚" value="${esc(c.fish || "")}" aria-label="魚の名前">
-  <input class="ls-input" name="count" inputmode="numeric" placeholder="匹" value="${esc(c.count || "")}" aria-label="数（匹）">
-  <input class="ls-input" name="size" inputmode="decimal" placeholder="cm" value="${esc(c.size || "")}" aria-label="大きさ（cm）">
-  <button type="button" class="ls-icon-button" data-fish-del aria-label="この魚を消す">${icon("close")}</button></div>`;
 
-// 書いている日記の場所・日時と、予報をいっしょに残せるか
+// 書いている日記の場所と、その日の予報をいっしょに残せるか
 function drawAt() {
   const e = editing, at = document.getElementById("diary-at"), note = document.getElementById("diary-snapnote");
   if (!e || !at) return;
   const title = e.id ? e.placeTitle : now?.placeTitle;
   // qcheck-ok: W1 場所の名前は esc 済み
   at.innerHTML = `${icon("place")}<strong>${esc(title || "")}</strong>`;
-  note.textContent = e.id
-    ? (e.snap ? `予報・潮・観測は、書いたとき（${e.snapHour ?? e.hour}時）のまま残ります。` : "")
-    : snapFor(e) ? `場所は上でえらんでいる所。${ymdText(e.ymd)} ${e.hour}時の予報・潮・観測もいっしょに残します。`
-      : `場所は上でえらんでいる所。この日の予報は読めないので、書いたことだけ残します（予報を読めるのは今日から${DAYS}日）。`;
+  note.textContent = e.id && e.day && e.ymd === editYmd ? "予報・潮・観測は、はじめに残した1日ぶんのまま使います。"
+    : !canKeepDay(e.ymd) ? `この日の予報は読めないので、書いたことだけ残します（予報を読めるのは約3か月前から${DAYS - 1}日先まで）。`
+      : `${e.id ? "" : "場所は上でえらんでいる所。"}${ymdText(e.ymd)}1日ぶんの予報・潮・観測もいっしょに残し、写真・釣果の時刻の値を見られます。${dayIndex(e.ymd) < 0 ? "前の日は、あとから読んだ値になります。" : ""}`;
 }
-// 書いている日時が、いま見ている日時と同じなら、その予報（ほかの日時は残せない）
-const snapFor = e => now && now.day.ymd === e.ymd && now.h === e.hour ? now.snap : null;
 
-async function drawPics() {
-  const el = document.getElementById("diary-pics");
+const itemRow = (it, i) => `<div class="item" data-item="${i}">
+  <span class="item-pic">${it.photo ? `<img data-photo="${esc(it.photo)}" alt="写真 ${i + 1}">` : icon("target")}</span>
+  <div class="item-fields">
+    <input type="time" class="ls-input" name="at" value="${toInput(it.at)}" aria-label="時刻">
+    <input class="ls-input" name="fish" placeholder="魚" value="${esc(it.fish || "")}" aria-label="魚の名前">
+    <input class="ls-input" name="count" inputmode="numeric" placeholder="匹" value="${esc(it.count || "")}" aria-label="数（匹）">
+    <input class="ls-input" name="size" inputmode="decimal" placeholder="cm" value="${esc(it.size || "")}" aria-label="大きさ（cm）">
+  </div>
+  <button type="button" class="ls-icon-button" data-item-del="${i}" aria-label="これを外す">${icon("close")}</button></div>`;
+function drawItems() {
+  const el = document.getElementById("diary-items");
   if (!el) return;
-  await Promise.all(pending.map(async p => { if (!p.url) p.url = await photoUrl(p.id); }));
-  // qcheck-ok: W1 写真の URL（この端末の blob:）と番号だけ
-  el.innerHTML = pending.map((p, i) => `<span class="pic"><img src="${esc(p.url || "")}" alt="写真 ${i + 1}"><button type="button" class="ls-icon-button pic-del" data-pic-del="${i}" aria-label="この写真を外す">${icon("close")}</button></span>`).join("");
-  document.getElementById("pic-add").hidden = pending.length >= MAX_PHOTOS;
+  // qcheck-ok: W1 esc した入力と写真の id だけ
+  el.innerHTML = items.map(itemRow).join("");
+  fillPhotos(el);
+}
+// 入力欄の中身を items に（並べなおす前・残す前に）
+function readItems() {
+  document.querySelectorAll("#diary-items .item").forEach(row => {
+    const it = items[Number(row.dataset.item)];
+    if (!it) return;
+    it.at = fromHM(row.querySelector('[name="at"]').value) ?? editing.start;
+    it.fish = row.querySelector('[name="fish"]').value.trim();
+    it.count = row.querySelector('[name="count"]').value.trim();
+    it.size = row.querySelector('[name="size"]').value.trim();
+  });
+}
+
+// ---- 写真の撮った時刻（JPEG の Exif。なければファイルの時刻）。その日のものでなければ null ----
+async function exifTime(file) {
+  const v = new DataView(await file.slice(0, 256 * 1024).arrayBuffer());
+  if (v.getUint16(0) !== 0xFFD8) return null;
+  let o = 2;
+  while (o + 10 < v.byteLength) {
+    const mk = v.getUint16(o), len = v.getUint16(o + 2);
+    if ((mk & 0xFF00) !== 0xFF00) return null;
+    if (mk === 0xFFE1 && v.getUint32(o + 4) === 0x45786966) {
+      const t = o + 10, le = v.getUint16(t) === 0x4949;
+      const u16 = p => v.getUint16(p, le), u32 = p => v.getUint32(p, le);
+      const find = (ifd, tag) => {
+        const n = u16(t + ifd);
+        for (let i = 0; i < n; i++) { const e = t + ifd + 2 + i * 12; if (u16(e) === tag) return { count: u32(e + 4), val: u32(e + 8) }; }
+        return null;
+      };
+      const ifd0 = u32(t + 4), ex = find(ifd0, 0x8769);
+      const dt = (ex && (find(ex.val, 0x9003) || find(ex.val, 0x9004))) || find(ifd0, 0x0132);
+      if (!dt) return null;
+      let s = "";
+      for (let i = 0; i < Math.min(dt.count, 20); i++) s += String.fromCharCode(v.getUint8(t + dt.val + i));
+      const m = /^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2})/.exec(s);
+      return m ? { ymd: `${m[1]}-${m[2]}-${m[3]}`, min: Number(m[4]) * 60 + Number(m[5]) } : null;
+    }
+    o += 2 + len;
+  }
+  return null;
+}
+async function takenAt(file, ymd) {
+  const ex = await exifTime(file).catch(() => null);
+  if (ex) return ex.ymd === ymd ? ex.min : null;
+  const jst = new Date(file.lastModified + 9 * 3600e3);
+  return jst.toISOString().slice(0, 10) === ymd ? jst.getUTCHours() * 60 + jst.getUTCMinutes() : null;
 }
 
 // 写真を小さくする（向きは写真のとおり）。JPEG で
@@ -322,23 +504,19 @@ async function photoUrl(id) {
 }
 function fillPhotos(root) {
   root.querySelectorAll("img[data-photo]").forEach(async img => { img.src = await photoUrl(img.dataset.photo); });
-  root.querySelectorAll("a[data-photo-link]").forEach(async a => { a.href = await photoUrl(a.dataset.photoLink); });
 }
 
 function readForm() {
   const f = document.getElementById("diary-form");
   const e = editing;
   e.ymd = f.querySelector('[name="ymd"]').value || e.ymd;
-  e.hour = Number(f.querySelector('[name="hour"]').value);
+  e.start = fromHM(f.querySelector('[name="start"]').value) ?? e.start;
+  e.end = fromHM(f.querySelector('[name="end"]').value);
   e.memo = f.querySelector('[name="memo"]').value.trim();
   e.saw = {};
   SAW.forEach(s => { const b = f.querySelector(`[data-chips="saw:${s.key}"] [aria-pressed="true"]`); if (b) e.saw[s.key] = b.dataset.chip; });
   e.did = [...f.querySelectorAll('[data-chips="did"] [aria-pressed="true"]')].map(b => b.dataset.chip);
-  e.catches = [...f.querySelectorAll(".fish-row")].map(r => ({
-    fish: r.querySelector('[name="fish"]').value.trim(),
-    count: r.querySelector('[name="count"]').value.trim(),
-    size: r.querySelector('[name="size"]').value.trim(),
-  })).filter(c => c.fish);
+  readItems();
 }
 async function save(btn) {
   readForm();
@@ -349,28 +527,39 @@ async function save(btn) {
     e.created = Date.now();
     e.place = now.place;
     e.placeTitle = now.placeTitle;
-    e.snap = snapFor(e);
-    if (e.snap) e.snapHour = e.hour;
   }
-  e.updated = Date.now();
-  const add = pending.filter(p => !p.saved).map(p => ({ id: p.id, type: p.type, buf: p.buf }));
-  e.photos = pending.map(p => p.id);
   btn.disabled = true;
+  const label = btn.innerHTML;
+  btn.textContent = "予報を読んでいます…";
+  // その日1日ぶん（まだないか、日にちを変えたとき）。読めなくても日記は残す
+  if (e.day?.ymd !== e.ymd) {
+    e.day = await getDay(e.place, e.ymd).catch(() => null);
+    if (e.day || e.ymd !== editYmd) delete e.snap;
+  }
+  if (!e.day) delete e.day;
+  e.hour = Math.floor(e.start / 60);
+  e.items = items.map(({ id, at, photo, fish, count, size }) => ({ id, at, photo: photo || null, fish: fish || "", count: count || "", size: size || "" }))
+    .filter(it => it.photo || it.fish).sort((a, b) => a.at - b.at);
+  e.photos = e.items.filter(it => it.photo).map(it => it.photo);
+  delete e.catches;
+  e.updated = Date.now();
+  const add = e.photos.filter(id => fresh.has(id)).map(id => ({ id, ...fresh.get(id) }));
   try {
     await diaryDb.save(e, add, dropped);
     // 消えにくくする（ブラウザが空きを作るときに消さないように頼む。だめでも動く）
     navigator.storage?.persist?.().catch(() => {});
-    pending.forEach(p => { if (!p.saved && p.url) urls.set(p.id, p.url); p.saved = true; });
+    add.forEach(p => records.set(p.id, p));
+    fresh = new Map(); // 残したので、画面の URL はそのまま使う
     dropped.forEach(id => { URL.revokeObjectURL(urls.get(id)); urls.delete(id); });
     entries = entries.filter(x => x.id !== e.id).concat(e);
     selected = e.ymd; month = e.ymd.slice(0, 7);
-    pending = []; dropped = [];
     stopEdit();
     drawCalendar();
     document.getElementById("diary-cal").scrollIntoView({ block: "start" });
   } catch {
     if (isNew) delete e.id;
     btn.disabled = false;
+    btn.innerHTML = label;
     document.getElementById("diary-snapnote").textContent = "残せませんでした。端末の空きを確かめてください。";
   }
 }
@@ -378,7 +567,11 @@ async function save(btn) {
 // ---- 押したとき ----
 async function onClick(ev) {
   const t = ev.target.closest("button, a");
-  if (!t) return;
+  if (!t) {
+    // 写真を見ているとき、窓の外を押したら閉じる
+    if (ev.target.id === "diary-viewer") closeViewer();
+    return;
+  }
   const d = t.dataset;
   if (t.id === "diary-new") startEdit();
   else if (d.month) {
@@ -395,30 +588,38 @@ async function onClick(ev) {
     const on = t.getAttribute("aria-pressed") === "true";
     if (!group.dataset.multi) group.querySelectorAll("[data-chip]").forEach(b => b.setAttribute("aria-pressed", "false"));
     t.setAttribute("aria-pressed", String(!on));
-    if (group.dataset.chips === "did") {
-      const fish = document.getElementById("diary-fish");
-      if (d.chip === "釣り" && !on) fish.hidden = false;
+  } else if ("itemAdd" in d) {
+    readForm();
+    // 今日なら今の時刻、ほかの日は、はじめの時刻
+    const n = tokyoParts();
+    const at = editing.ymd === n.ymd ? n.hour * 60 + new Date().getMinutes() : editing.start;
+    items.push({ id: newId(), at, photo: null, fish: "", count: "", size: "" });
+    drawItems();
+    document.querySelector("#diary-items .item:last-child [name='fish']").focus();
+  } else if (d.itemDel != null) {
+    readItems();
+    const [it] = items.splice(Number(d.itemDel), 1);
+    if (it?.photo) {
+      if (fresh.has(it.photo)) { URL.revokeObjectURL(urls.get(it.photo)); urls.delete(it.photo); fresh.delete(it.photo); }
+      else dropped.push(it.photo);
     }
-  } else if ("fishAdd" in d) {
-    document.getElementById("fish-rows").insertAdjacentHTML("beforeend", fishRow());
-    document.querySelector("#fish-rows .fish-row:last-child input").focus();
-  } else if ("fishDel" in d) {
-    const rows = document.getElementById("fish-rows");
-    t.closest(".fish-row").remove();
-    if (!rows.children.length) rows.insertAdjacentHTML("beforeend", fishRow());
-  } else if (d.picDel != null) {
-    const [p] = pending.splice(Number(d.picDel), 1);
-    if (p.saved) dropped.push(p.id); else URL.revokeObjectURL(p.url);
-    drawPics();
+    drawItems();
   } else if ("cancel" in d) stopEdit();
   else if ("save" in d) save(t);
+  else if (d.view) {
+    const e = entries.find(x => x.id === d.view);
+    if (e) openViewer(e, Number(d.step));
+  } else if (d.viewerGo) {
+    viewing.i = Math.max(0, Math.min(viewing.steps.length - 1, viewing.i + Number(d.viewerGo)));
+    drawViewer();
+  } else if ("viewerClose" in d) closeViewer();
   else if (d.share) shareEntry(entries.find(e => e.id === d.share), t);
   else if (d.edit) startEdit(entries.find(e => e.id === d.edit));
   else if (d.delete) {
     const e = entries.find(x => x.id === d.delete);
     if (!e) return;
     // Q キットの確認の窓（読めなかったときは消さない）
-    const yes = await window.LineShareUI?.ask({ title: `${ymdText(e.ymd)} ${e.hour}時の日記を消しますか？`, text: "写真もいっしょに消え、もとに戻せません。", ok: "消す", danger: true });
+    const yes = await window.LineShareUI?.ask({ title: `${ymdText(e.ymd)} ${toHM(startOf(e))}の日記を消しますか？`, text: "写真もいっしょに消え、もとに戻せません。", ok: "消す", danger: true });
     if (!yes) return;
     await diaryDb.remove(e).catch(() => {});
     (e.photos || []).forEach(id => { URL.revokeObjectURL(urls.get(id)); urls.delete(id); });
@@ -434,26 +635,87 @@ async function onClick(ev) {
     drawWeekSeg();
     drawCalendar();
   } else if ("export" in d) exportAll(t);
+  else if ("csv" in d) exportCsv(t);
 }
 async function onChange(ev) {
   const t = ev.target;
   if (t.matches("[data-pic-input]")) {
-    const files = [...t.files].slice(0, MAX_PHOTOS - pending.length);
+    const files = [...t.files];
     t.value = "";
+    readForm();
     for (const file of files) {
       try {
+        const at = await takenAt(file, editing.ymd);
         const p = await shrink(file);
-        pending.push({ id: newId(), ...p, url: URL.createObjectURL(new Blob([p.buf], { type: p.type })), saved: false });
+        const id = newId();
+        fresh.set(id, p);
+        urls.set(id, URL.createObjectURL(new Blob([p.buf], { type: p.type })));
+        items.push({ id: newId(), at: at ?? editing.start, photo: id, fish: "", count: "", size: "" });
       } catch { /* 読めない写真は飛ばす */ }
     }
-    drawPics();
-  } else if (t.matches('[name="ymd"], [name="hour"]') && editing) {
+    items.sort((a, b) => a.at - b.at);
+    drawItems();
+  } else if (t.matches('[name="ymd"], [name="start"]') && editing) {
     readForm();
-    // 予報を読んである日なら、ページもその日時にして、その予報を残せるようにする（書きなおしのときは動かさない）
+    // 予報を読んである日なら、ページもその日時にする（書きなおしのときは動かさない）
     const i = dayIndex(editing.ymd);
-    if (!editing.id && i >= 0 && i < DAYS) hooks.setView(i, editing.hour);
+    if (!editing.id && i >= 0 && i < DAYS) hooks.setView(i, Math.floor(editing.start / 60));
     drawAt();
   } else if (t.matches("[data-import]")) importFile(t);
+}
+document.addEventListener("keydown", ev => {
+  if (!viewing || (ev.key !== "ArrowLeft" && ev.key !== "ArrowRight")) return;
+  viewing.i = Math.max(0, Math.min(viewing.steps.length - 1, viewing.i + (ev.key === "ArrowRight" ? 1 : -1)));
+  drawViewer();
+});
+
+// ---- 分析用に書き出す（CSV。1行が写真・釣果1つ。ないときは日記1つ。その時刻の潮・風・波つき） ----
+const CSV_HEAD = ["日付", "時刻", "種類", "場所", "緯度", "経度", "はじめ", "おわり", "魚", "匹", "cm", "写真",
+  "したこと", "見た波", "見た風", "見た水", "月齢", "潮", "潮位差m", "潮位cm", "潮位の高さ%", "上げ下げ", "潮の分", "満潮から分", "まづめ", "夜",
+  "波m", "波の予報の低い値", "波の予報の高い値", "周期s", "波の向き", "風m/s", "風の予報の低い値", "風の予報の高い値", "風向", "風向°", "突風m/s",
+  "天気", "気温", "降水確率%", "雨mm", "水温", "沖の流れkn", "沖の流れの向き", "あとから読んだ値", "メモ"];
+function csvRows() {
+  const rows = [];
+  const n = (v, d = 1) => v == null || Number.isNaN(v) ? "" : Number(v).toFixed(d);
+  [...entries].sort((a, b) => a.ymd.localeCompare(b.ymd) || startOf(a) - startOf(b)).forEach(e => {
+    const list = [...itemsOf(e)].sort((a, b) => a.at - b.at);
+    (list.length ? list : [{ at: startOf(e), diary: true }]).forEach(it => {
+      const c = condAt(e, it.at) || {}, t = c.tide || {};
+      rows.push([
+        e.ymd, toHM(it.at), it.diary ? "日記" : it.fish ? "釣果" : "写真", e.placeTitle || e.place?.name || "", n(e.place?.lat, 4), n(e.place?.lon, 4),
+        toHM(startOf(e)), e.end != null ? toHM(e.end) : "", it.fish || "", it.count || "", it.size || "", it.photo ? 1 : 0,
+        (e.did || []).join("・"), e.saw?.wave || "", e.saw?.wind || "", e.saw?.water || "",
+        t.age ?? "", t.moon || "", (t.diff || "").replace(/[^\d.]/g, ""), n(t.cm, 0), t.pct ?? "", t.phase || "", t.stage ?? "", t.fromHigh ?? "", c.inMazume || "", c.night == null ? "" : c.night ? 1 : 0,
+        n(c.waveMean), n(c.wave?.lo), n(c.wave?.hi), n(c.period, 0), c.waveDir != null ? dirName(c.waveDir) : "",
+        n(c.windMean), n(c.wind?.lo), n(c.wind?.hi), c.windDir != null ? dirName(c.windDir) : "", n(c.windDir, 0), n(c.gust),
+        c.wx || "", n(c.temp), c.rain ?? "", n(c.rainMm), n(c.sst), n(c.cur?.kn), c.cur?.dir != null ? dirName(c.cur.dir) : "", c.later ? 1 : 0, e.memo || "",
+      ]);
+    });
+  });
+  return rows;
+}
+async function exportCsv(btn) {
+  const cell = v => { const s = String(v ?? ""); return /[",\r\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s; };
+  const rows = csvRows();
+  // 先頭の BOM … 表計算ソフトで日本語が化けないように
+  const text = "﻿" + [CSV_HEAD, ...rows].map(r => r.map(cell).join(",")).join("\r\n");
+  const ok = await saveFile(new Blob([text], { type: "text/csv" }), `${EXPORT_TAG}-${today().replaceAll("-", "")}.csv`);
+  if (ok) keepNote(`${rows.length}行を書き出しました（1行が写真・釣果1つ。その時刻の潮・風・波つき）。${IN_APP ? "保存されないときは、Safari などのブラウザで開いてください。" : ""}`);
+  btn.blur();
+}
+// ファイルを渡す。スマホは共有の画面から（「ファイルに保存」できる）。だめなら、ふつうのダウンロード。やめたら false
+async function saveFile(blob, name) {
+  const file = new File([blob], name, { type: blob.type });
+  if (IS_PHONE && navigator.canShare?.({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: name }); return true; }
+    catch (err) { if (err?.name === "AbortError") return false; }
+  }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  return true;
 }
 
 // ---- 書き出す・読みこむ（この端末だけに残るので、ときどき書き出しておく） ----
@@ -462,16 +724,11 @@ const fromB64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0)).buffer;
 async function exportAll(btn) {
   const photos = [];
   for (const e of entries) for (const id of e.photos || []) {
-    const p = await diaryDb.photo(id).catch(() => null);
+    const p = records.get(id) || await diaryDb.photo(id).catch(() => null);
     if (p) photos.push({ id, type: p.type, data: toB64(p.buf) });
   }
-  const blob = new Blob([JSON.stringify({ app: EXPORT_TAG, version: 1, entries, photos })], { type: "application/json" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `${EXPORT_TAG}-${today().replaceAll("-", "")}.json`;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-  keepNote(`${entries.length}件を書き出しました。`);
+  const ok = await saveFile(new Blob([JSON.stringify({ app: EXPORT_TAG, version: 1, entries, photos })], { type: "application/json" }), `${EXPORT_TAG}-${today().replaceAll("-", "")}.json`);
+  if (ok) keepNote(`${entries.length}件を書き出しました。${IN_APP ? "保存されないときは、Safari などのブラウザで開いてください。" : ""}`);
   btn.blur();
 }
 async function importFile(input) {
@@ -499,25 +756,47 @@ function drawWeekSeg() {
   const ws = weekStart();
   document.querySelectorAll("[data-week]").forEach(b => b.setAttribute("aria-pressed", String(Number(b.dataset.week) === ws)));
 }
+// どこに残るかの注意。アプリの中のブラウザ（LINE など）は、そのアプリの中にだけ残る。iPhone の Safari は、ホーム画面に置くと消えにくい
+function whereHtml() {
+  if (IN_APP) {
+    const u = new URL(location.href);
+    u.searchParams.set("openExternalBrowser", "1"); // LINE で開いたとき、ふだんのブラウザで開きなおす
+    return `<div class="alert diary-where">${icon("warn")}<div><strong>アプリの中のブラウザで開いています</strong><br>
+      ここで書いた日記は、このアプリの中にだけ残り、Safari などからは見えません。アプリのキャッシュを消すと消え、書き出しもできないことがあります。
+      ${IN_LINE ? `<br><a href="${esc(u.href)}">ふだんのブラウザで開く</a>` : "<br>メニューから「ブラウザで開く」を選んでください。"}</div></div>`;
+  }
+  if (IS_IOS && !STANDALONE) {
+    return `<div class="alert diary-where">${icon("tip")}<div><strong>ホーム画面に置いて使うのがおすすめ</strong><br>
+      Safari のままだと、しばらく開かないと日記が消えることがあります。共有ボタン →「ホーム画面に追加」で置き、そこから開いてください。
+      ホーム画面のほうは Safari と別の保存場所なので、ここで書いた日記は「書き出す」→ ホーム画面のほうで「読みこむ」で移せます。</div></div>`;
+  }
+  return "";
+}
 export function drawDiaryShell() {
-  // qcheck-ok: W1 決まった文字だけ
+  // qcheck-ok: W1 決まった文字と、esc したこのページの URL だけ
   box().innerHTML = `
     <div class="sec-head">
       <h2>${icon("notebook")}海の日記</h2>
       <button type="button" class="ls-button" id="diary-new"${now ? "" : " disabled"}>${icon("edit")}書く</button>
     </div>
-    <p class="muted small diary-lead">見た海のようすや釣果を書くと、その日時の予報・潮・観測もいっしょに残ります。予報とくらべて、次の日えらびに。</p>
+    <p class="muted small diary-lead">写真・釣果を時刻つきで残すと、その時刻の潮位・上げ下げ・風・波がいっしょに見られます。その日1日ぶんの予報・潮も残すので、あとでくらべて次の日えらびに。</p>
+    ${whereHtml()}
     <div id="diary-form" class="diary-form" hidden></div>
     <div id="diary-cal"></div>
     <div id="diary-day"></div>
+    <dialog id="diary-viewer" class="viewer" aria-label="写真とその時刻の値"></dialog>
     <details class="diary-keep">
       <summary>週のはじまり・書き出し</summary>
       <div class="diary-keep-row"><span class="small sub">週のはじまり</span>
         <div class="seg" role="group" aria-label="週のはじまり"><button type="button" data-week="1">月曜</button><button type="button" data-week="0">日曜</button></div></div>
-      <p class="muted small">日記と写真はこの端末のブラウザにだけ残ります（ほかの端末や人には送られません）。ブラウザのデータを消すと日記も消えるので、ときどき書き出してください。iPhone はホーム画面に置いて開くと消えにくくなります。</p>
+      <p class="muted small">日記と写真はこのブラウザにだけ残ります（ほかの端末や人には送られません）。同じ端末でも、ブラウザやアプリがちがうと別の場所です。ブラウザのデータを消すと日記も消えるので、ときどき書き出してください。</p>
       <div class="diary-keep-row">
         <button type="button" class="ls-button" data-export>${icon("backup")}書き出す</button>
         <label class="ls-button">${icon("upload")}読みこむ<input type="file" accept="application/json,.json" class="vh" data-import></label>
+      </div>
+      <p class="muted small">分析用：写真・釣果1つを1行に、その時刻の潮位・上げ下げ・風・波・水温などを並べた表（CSV）。表計算ソフトで開けます。</p>
+      <div class="diary-keep-row">
+        <button type="button" class="ls-button" data-csv>${icon("chart")}分析用に書き出す</button>
       </div>
       <p class="muted small" id="diary-keep-note" aria-live="polite"></p>
     </details>`;
