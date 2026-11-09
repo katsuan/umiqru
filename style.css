@@ -395,5 +395,4 @@ dialog#map-pick { width: min(720px, calc(100vw - 32px)); }
 .map-in p { margin: 0; }
 .map-ll strong { font-variant-numeric: tabular-nums; }
 .map-name { display: grid; gap: 4px; }
-.map-name input { appearance: none; -webkit-appearance: none; width: 100%; min-width: 0; font: inherit; font-size: 16px; color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 16px; height: 40px; box-sizing: border-box; }
 .map-box .leaflet-control-attribution { font-size: 11px; }

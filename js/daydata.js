@@ -3,12 +3,12 @@
 // 読まれるところ：js/diary.js、app.js（mazume）
 import { DAYS, WAVE_MODELS, WIND_MODELS } from "./sources.js";
 import { state } from "./state.js";
-import { hm, hmText, sliceDay, tokyoParts } from "./time.js";
+import { daysBetween, hm, hmText, sliceDay, tokyoParts } from "./time.js";
 import { meanDir, range, tideRange, wxName } from "./format.js";
 import { loadForecasts, loadTide, tideFor } from "./forecast.js";
 import { placeContext } from "./place.js";
 
-export const PAST_DAYS = 92; // 予報を、あとから読める日数（Open-Meteo の過去の値）
+const PAST_DAYS = 92; // 予報を、あとから読める日数（Open-Meteo の過去の値）
 const CORE = ["msm", "wind", "waves", "sea", "wx"]; // これが全部届いていたら、ページで読んだ予報をそのまま使う
 
 // まづめ：薄明のはじまり〜日の出の1時間後、日の入りの1時間前〜薄明のおわり（めやす）
@@ -21,7 +21,7 @@ export function mazume(tide) {
 }
 
 // 今日から何日目か
-export const dayIndex = ymd => Math.round((Date.parse(`${ymd}T00:00:00Z`) - Date.parse(`${tokyoParts().ymd}T00:00:00Z`)) / 864e5);
+export const dayIndex = ymd => daysBetween(tokyoParts().ymd, ymd);
 // その日の予報を読めるか（約3か月前〜6日先）
 export const canKeepDay = ymd => { const i = dayIndex(ymd); return i >= -PAST_DAYS && i <= DAYS - 1; };
 
@@ -65,10 +65,12 @@ export async function getDay(place, ymd) {
     const tide = tideFor(ymd) || (port ? await loadTide(port, ymd).catch(() => null) : null);
     return pack(d, i, ymd, tide, port?.name || null, { jma: d.text?.[ymd]?.wave || null, amedas: i === 0 ? d.amedas || null : null });
   }
-  const ctx = await placeContext(place);
-  const [f, tide] = await Promise.all([
-    loadForecasts(place, Promise.resolve(ctx), () => {}, { ymd }),
-    ctx.port ? loadTide(ctx.port, ymd).catch(() => null) : null,
+  // 場所の調べ（港・地域）を待たずに予報を読みはじめる
+  const ctxP = placeContext(place);
+  const [f, tide, ctx] = await Promise.all([
+    loadForecasts(place, ctxP, () => {}, { ymd }),
+    ctxP.then(c => c.port ? loadTide(c.port, ymd).catch(() => null) : null),
+    ctxP,
   ]);
   if (CORE.every(k => f.errors.includes(k)) && !tide) return null;
   return pack(f, 0, ymd, tide, ctx.port?.name || null, { later: i < 0 });
@@ -78,25 +80,36 @@ export async function getDay(place, ymd) {
 const mean = a => a.length ? a.reduce((s, v) => s + v, 0) / a.length : null;
 const near = (list, m) => list.reduce((b, e) => !b || Math.abs(e.m - m) < Math.abs(b.m - m) ? e : b, null);
 
-// 潮：潮位（20分ごとをつないで）、上げ・下げと「上げ3分」（干潮から満潮までを10に分けて）、満潮から何分、その日の高さの中の割合
+// その日の潮の、時刻によらない値（満潮・干潮の並び・高さの幅）。1日に何度も読むので、潮ごとに1回だけ作る
+const tideDays = new WeakMap();
+function tideDay(t) {
+  if (tideDays.has(t)) return tideDays.get(t);
+  const ev = [...t.flood.map(e => ({ ...e, k: "満潮" })), ...t.edd.map(e => ({ ...e, k: "干潮" }))]
+    .map(e => ({ ...e, m: hm(e.time) * 60 })).sort((a, b) => a.m - b.m);
+  const out = { ev, highs: ev.filter(e => e.k === "満潮"), lo: Math.min(...t.cm), hi: Math.max(...t.cm),
+    diff: tideRange(t), events: ev.map(e => `${e.k} ${e.time}`).join("・") };
+  tideDays.set(t, out);
+  return out;
+}
+// 潮：潮位（20分ごとをつないで）、上げ・下げと「上げ3分」（干潮から満潮までを10に分けて）、満潮から何分、その日の高さの中の割合。
+// near … 満潮・干潮の15分以内ならその名前
 function tideAt(t, min) {
   if (!t?.cm?.length) return null;
   const k = min / 20, i = Math.max(0, Math.min(Math.floor(k), t.cm.length - 2)), f = k - i;
   const cm = t.cm[i] + (t.cm[i + 1] - t.cm[i]) * f;
-  const ev = [...t.flood.map(e => ({ ...e, k: "満潮" })), ...t.edd.map(e => ({ ...e, k: "干潮" }))]
-    .map(e => ({ ...e, m: hm(e.time) * 60 })).sort((a, b) => a.m - b.m);
+  const { ev, highs, lo, hi, diff, events } = tideDay(t);
   const prev = [...ev].reverse().find(e => e.m <= min), next = ev.find(e => e.m > min);
   const phase = next ? (next.k === "満潮" ? "上げ" : "下げ") : prev ? (prev.k === "満潮" ? "下げ" : "上げ") : null;
   const stage = prev && next ? Math.max(1, Math.min(9, Math.round((min - prev.m) / (next.m - prev.m) * 10))) : null;
   const close = near(ev, min);
-  const stageText = close && Math.abs(close.m - min) <= 15 ? `${close.k}ごろ` : phase ? `${phase}${stage ? `${stage}分` : ""}` : "";
-  const high = near(ev.filter(e => e.k === "満潮"), min);
-  const lo = Math.min(...t.cm), hi = Math.max(...t.cm);
+  const nearBy = close && Math.abs(close.m - min) <= 15 ? close.k : null;
+  const stageText = nearBy ? `${nearBy}ごろ` : phase ? `${phase}${stage ? `${stage}分` : ""}` : "";
+  const high = near(highs, min);
   return {
     cm, pct: hi > lo ? Math.round((cm - lo) / (hi - lo) * 100) : null,
-    phase, stage, stageText, fromHigh: high ? Math.round(min - high.m) : null,
+    phase, stage, near: nearBy, stageText, fromHigh: high ? Math.round(min - high.m) : null,
     moon: t.moon?.title || "", age: t.moon?.age != null ? Number(t.moon.age) : null,
-    diff: tideRange(t), port: t.port, events: ev.map(e => `${e.k} ${e.time}`).join("・"),
+    diff, port: t.port, events,
   };
 }
 

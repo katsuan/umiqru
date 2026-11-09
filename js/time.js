@@ -2,15 +2,18 @@
 // 読まれるところ：app.js と js/ の部品
 import { TZ } from "./sources.js";
 
+// 日本時間に直す部品（作るのが重いので1回だけ）
+const TOKYO = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" });
 export function tokyoParts(d = new Date()) {
-  const f = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" });
-  const p = Object.fromEntries(f.formatToParts(d).map(x => [x.type, x.value]));
+  const p = Object.fromEntries(TOKYO.formatToParts(d).map(x => [x.type, x.value]));
   return { ymd: `${p.year}-${p.month}-${p.day}`, hour: Number(p.hour) };
 }
 export function addDays(ymd, n) {
   const [y, m, d] = ymd.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
 }
+// a の日から b の日まで何日（"2026-11-09" の形どうし）
+export const daysBetween = (a, b) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 864e5);
 export const WEEK = ["日", "月", "火", "水", "木", "金", "土"];
 export function dayLabel(i) {
   const ymd = addDays(tokyoParts().ymd, i);

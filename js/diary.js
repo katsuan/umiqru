@@ -4,8 +4,8 @@
 import { NAMES } from "./names.js";
 import { DAYS } from "./sources.js";
 import { store } from "./store.js";
-import { WEEK, addDays, tokyoParts } from "./time.js";
-import { arrow, dirName, esc, fmt, spread, wxShort } from "./format.js";
+import { WEEK, addDays, hmText, tokyoParts } from "./time.js";
+import { arrow, closeDialog, dirName, esc, fmt, icon, openDialog, spread, wxShort } from "./format.js";
 import { diaryDb } from "./diary-db.js";
 import { canCard, oqrnCardUrl, pageUrl } from "./card.js";
 import { atTime, canKeepDay, dayIndex, getDay } from "./daydata.js";
@@ -38,7 +38,6 @@ let viewing = null; // 写真を大きく見ているとき { e, steps, i }
 const urls = new Map(); // 写真の id → 画面に出す URL
 const records = new Map(); // 写真の id → { type, buf }（共有するとき、押してすぐ写真を渡せるように）
 
-const icon = name => `<span class="ls-icon is-text" data-icon="${name}" aria-hidden="true"></span>`;
 const box = () => document.getElementById("sec-diary");
 const today = () => tokyoParts().ymd;
 const newId = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
@@ -47,7 +46,7 @@ const ymdText = ymd => {
   return `${m}月${d}日（${WEEK[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]}）`;
 };
 // 時刻は 0:00 からの分で持つ。"5:30" と分の行き来
-const toHM = min => `${Math.floor(min / 60)}:${String(Math.round(min % 60)).padStart(2, "0")}`;
+const toHM = min => hmText(min / 60);
 const toInput = min => min == null ? "" : `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(Math.round(min % 60)).padStart(2, "0")}`;
 const fromHM = s => { const m = /^(\d{1,2}):(\d{2})/.exec(s || ""); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
 const weekStart = () => window.QWeekStart ? window.QWeekStart.get(store.get("umiqru:weekStart")) : (store.get("umiqru:weekStart") ?? 1);
@@ -103,7 +102,7 @@ function drawCalendar() {
   const first = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
   const lead = (first - ws + 7) % 7;
   const count = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  const byDay = groupByDay();
+  const byDay = groupByDay(), now = today();
   const cells = [];
   for (let i = 0; i < lead; i++) cells.push(`<span class="cal-pad"></span>`);
   for (let d = 1; d <= count; d++) {
@@ -111,7 +110,7 @@ function drawCalendar() {
     const list = byDay[ymd] || [];
     const pic = list.flatMap(e => e.photos || [])[0];
     const label = `${m}月${d}日${list.length ? `・日記 ${list.length}` : ""}`;
-    cells.push(`<button type="button" class="cal-day${ymd === today() ? " is-today" : ""}" data-day="${ymd}" aria-pressed="${ymd === selected}" aria-label="${label}">
+    cells.push(`<button type="button" class="cal-day${ymd === now ? " is-today" : ""}" data-day="${ymd}" aria-pressed="${ymd === selected}" aria-label="${label}">
       <span class="cal-num">${d}</span>${pic ? `<img class="cal-pic" data-photo="${esc(pic)}" alt="">` : list.length ? `<span class="cal-dot"></span>` : ""}</button>`);
   }
   while (cells.length % 7) cells.push(`<span class="cal-pad"></span>`);
@@ -221,7 +220,7 @@ function snapHtml(e) {
   return rows.length ? `<details class="entry-snap"><summary>${toHM(startOf(e))}の予報と観測</summary>${rowsHtml(rows)}</details>` : "";
 }
 // 表のマスに入る短い潮の段階：「上6」「下1」、満潮・干潮のころは「満」「干」
-const tideShort = t => !t?.stageText ? "—" : t.stageText.endsWith("ごろ") ? t.stageText[0] : `${t.phase[0]}${t.stage ?? ""}`;
+const tideShort = t => !t?.stageText ? "—" : t.near ? t.near[0] : `${t.phase[0]}${t.stage ?? ""}`;
 // その日1日ぶん（1時間ごと）。写真・釣果のある時刻に印、はじめ〜おわりに色
 function dayTable(e) {
   const marks = new Set(itemsOf(e).map(it => Math.round(it.at / 60)));
@@ -249,7 +248,7 @@ function openViewer(e, i) {
   viewing = { e, steps: stepsOf(e), i };
   drawViewer();
   const dlg = document.getElementById("diary-viewer");
-  if (!dlg.open) { if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", ""); }
+  openDialog(dlg);
 }
 function drawViewer() {
   const { e, steps, i } = viewing;
@@ -276,7 +275,7 @@ function drawViewer() {
 }
 function closeViewer() {
   const dlg = document.getElementById("diary-viewer");
-  if (dlg.open) { if (dlg.close) dlg.close(); else dlg.removeAttribute("open"); }
+  closeDialog(dlg);
   viewing = null;
 }
 
@@ -518,14 +517,19 @@ async function shrink(file) {
     return { type: "image/jpeg", buf: await blob.arrayBuffer() };
   } finally { URL.revokeObjectURL(url); }
 }
-async function photoUrl(id) {
-  if (urls.has(id)) return urls.get(id);
-  const p = await diaryDb.photo(id).catch(() => null);
-  if (!p) return "";
-  records.set(id, p);
-  const u = URL.createObjectURL(new Blob([p.buf], { type: p.type }));
-  urls.set(id, u);
-  return u;
+// カレンダーと日の一覧に同じ写真が出ても、読むのは1回（読んでいる途中のものは、その読みこみを待つ）
+const reading = new Map();
+function photoUrl(id) {
+  if (urls.has(id)) return Promise.resolve(urls.get(id));
+  if (!reading.has(id)) reading.set(id, diaryDb.photo(id).catch(() => null).then(p => {
+    reading.delete(id);
+    if (!p) return "";
+    records.set(id, p);
+    const u = URL.createObjectURL(new Blob([p.buf], { type: p.type }));
+    urls.set(id, u);
+    return u;
+  }));
+  return reading.get(id);
 }
 function fillPhotos(root) {
   root.querySelectorAll("img[data-photo]").forEach(async img => { img.src = await photoUrl(img.dataset.photo); });
@@ -823,11 +827,10 @@ function openInstall() {
       <button type="button" class="ls-button" data-install-skip>このまま書く</button>
     </div>
   </div>`;
-  if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", "");
+  openDialog(dlg);
 }
 function closeInstall() {
-  const dlg = document.getElementById("diary-install");
-  if (dlg?.open) { if (dlg.close) dlg.close(); else dlg.removeAttribute("open"); }
+  closeDialog(document.getElementById("diary-install"));
 }
 export function drawDiaryShell() {
   // qcheck-ok: W1 決まった文字と、esc したこのページの URL だけ

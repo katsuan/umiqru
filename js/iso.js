@@ -3,6 +3,7 @@
 import { getJSON } from "./net.js";
 import { km } from "./place.js";
 import { store } from "./store.js";
+import { daysBetween } from "./time.js";
 
 let islands = [];
 // 読みこむ（読めなくても、磯割を出さないだけ）
@@ -16,7 +17,6 @@ export function islandFor(place) {
   return best;
 }
 
-const daysBetween = (a, b) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 864e5);
 const mod = (n, m) => ((n % m) + m) % m;
 // その島・その日の渡船ごとの磯 [{ ferry, group }]。発表のない日は null
 export function isoOn(island, ymd) {
@@ -26,9 +26,12 @@ export function isoOn(island, ymd) {
   return p.ferries.map(f => ({ ferry: f.name, group: ex[f.name] || p.groups[mod(k + f.shift, p.groups.length)] }));
 }
 // 渡船の船の色（data/isowari.json の color。なければ null）
-export const ferryColor = (island, name) => (island?.periods || []).flatMap(p => p.ferries).find(f => f.name === name)?.color || null;
+const ferryColor = (island, name) => (island?.periods || []).flatMap(p => p.ferries).find(f => f.name === name)?.color || null;
 // 色をつける style（--ferry に船の色）。色がなければ空
 export const ferryStyle = (island, name) => { const c = ferryColor(island, name); return c && /^#[0-9a-f]{3,8}$/i.test(c) ? ` style="--ferry:${c}"` : ""; };
+// 短い名前：「家中渡船」→「家中」（ウィジェットの Parameter もこの名前。SQriptable の seaFerryShort と同じ決まり）、まとまりの先頭の磯
+export const ferryShort = name => name.replace(/渡船$/, "");
+export const groupFirst = group => group.split("・")[0];
 // その島の渡船の名前と、磯の名前（まとまりを分けたもの。日記の候補）
 export const ferriesOf = island => [...new Set((island?.periods || []).flatMap(p => p.ferries.map(f => f.name)))];
 export const spotsOf = island => [...new Set((island?.periods || []).flatMap(p => p.groups.flatMap(g => g.split("・"))))];

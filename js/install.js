@@ -1,10 +1,10 @@
 // うみくる：ホーム画面に置く案内。日記はブラウザごとに別の場所に残り、iPhone の Safari はしばらく開かないと消すことがあるので、日記はホーム画面のうみくるで書いてもらう
 // 読まれるところ：js/diary.js
 const UA = navigator.userAgent;
-export const IN_LINE = /\bLine\//i.test(UA);
+const IN_LINE = /\bLine\//i.test(UA);
 export const IN_APP = IN_LINE || /FBAN|FBAV|Instagram|Twitter/i.test(UA);
-export const IS_IOS = /iPhone|iPad|iPod/.test(UA) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-export const IS_ANDROID = /Android/.test(UA);
+const IS_IOS = /iPhone|iPad|iPod/.test(UA) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const IS_ANDROID = /Android/.test(UA);
 export const IS_PHONE = IS_IOS || IS_ANDROID;
 export const standalone = () => navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
 // ホーム画面に置くのをすすめるか（スマホとアプリの中のブラウザだけ。パソコンは消えにくいので出さない）
@@ -28,7 +28,7 @@ export async function promptInstall() {
 }
 
 // LINE で開いたとき、ふだんのブラウザで開きなおすリンク
-export function outsideUrl() {
+function outsideUrl() {
   const u = new URL(location.href);
   u.searchParams.set("openExternalBrowser", "1");
   return u.href;

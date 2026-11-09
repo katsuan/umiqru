@@ -91,3 +91,9 @@ export function meanDir(list) {
 export const spread = v => v.n > 1 && v.hi - v.lo >= 0.05 ? `${fmt(v.lo)}〜${fmt(v.hi)}` : fmt(v.hi);
 // 「鵜来島（宿毛市）」→「鵜来島」（同じ名前の場所を選びなおしたときに添えた地域を外す）
 export const baseName = name => name.replace(/（.+）$/, "");
+
+// 線のしるし（Q キットの ls-icon）
+export const icon = name => `<span class="ls-icon is-text" data-icon="${name}" aria-hidden="true"></span>`;
+// 窓（dialog）を開く・閉じる（showModal のない古い端末は open の印だけ）
+export const openDialog = dlg => { if (dlg.open) return; if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", ""); };
+export const closeDialog = dlg => { if (!dlg?.open) return; if (dlg.close) dlg.close(); else dlg.removeAttribute("open"); };

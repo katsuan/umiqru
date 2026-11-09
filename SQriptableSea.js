@@ -8,7 +8,7 @@
 // 新しい版が出ると通知で知らせます。入れかえ方は https://katsuan.github.io/umiqru/#howto
 // ======================================
 
-const SEA_BUILD = "056968fccd";
+const SEA_BUILD = "07f7e1c096";
 
 const PALETTE = {
   brand: "#6C47FF",
@@ -1062,11 +1062,12 @@ function seaOptions(arg, isFerry = () => null) {
   let deg = false;
   String(arg || "").split(",").map((w) => w.trim()).filter(Boolean).forEach((w) => {
     const k = w.toLowerCase();
+    const ferry = isFerry(w);
     if (SEA_SHOW[k]) {
       if (!show.includes(SEA_SHOW[k])) show.push(SEA_SHOW[k]);
     } else if (k === "deg" || k === "角度") deg = true;
     else if (k === "16" || k === "16方位") deg = false;
-    else if (isFerry(w)) ferries.push(isFerry(w));
+    else if (ferry) ferries.push(ferry);
     else rest.push(w);
   });
   return { place: rest.join(","), show, deg, ferries };
@@ -1093,7 +1094,7 @@ function seaIsoOn(iso, day) {
   const p = (iso.periods || []).find((x) => day >= x.from && day <= x.to);
   if (!p) return null;
   const k = Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${p.anchor}T00:00:00Z`)) / 864e5);
-  const ex = (iso.except || {})[day] || {};
+  const ex = (iso.except && iso.except[day]) || {};
   const n = p.groups.length;
   return p.ferries.map((f) => ({ ferry: f.name, color: f.color || null, group: ex[f.name] || p.groups[(((k + f.shift) % n) + n) % n] }));
 }
@@ -1110,13 +1111,15 @@ function seaIsoLine(d, now) {
 }
 
 function seaIsoDraw(row, iso, width, theme) {
-  const need = (list) => list.reduce((a, x) => a + textWidth(x.text, 9) + 18, iso.when ? textWidth(iso.when, 9) + 8 : 0);
+  const itemW = (x) => textWidth(x.text, 9) + 18;
+  const whenW = iso.when ? textWidth(iso.when, 9) + 8 : 0;
+  const need = (list) => list.reduce((a, x) => a + itemW(x), whenW);
   const items = need(iso.full) <= width ? iso.full : iso.short;
-  if (need(items.slice(0, 1)) > width) return 0;
-  let used = 0;
-  if (iso.when) { txt(row, iso.when, 9, theme.sub, "semibold", { scale: 0.7 }); used += textWidth(iso.when, 9) + 8; }
+  if (need(items.slice(0, 1)) > width) return;
+  let used = whenW;
+  if (iso.when) txt(row, iso.when, 9, theme.sub, "semibold", { scale: 0.7 });
   items.forEach((x) => {
-    const n = textWidth(x.text, 9) + 18;
+    const n = itemW(x);
     if (used + n > width) return;
     used += n;
     const dot = row.addStack();
@@ -1126,12 +1129,11 @@ function seaIsoDraw(row, iso, width, theme) {
     txt(dot, "●", 7, x.color ? new Color(x.color) : theme.sub);
     txt(dot, x.text, 9, theme.text, "semibold", { scale: 0.7 });
   });
-  return used;
 }
 
 async function loadSea(arg, ctx, item) {
-  const isoData = await getJSON(`${SEA.page}data/isowari.json`, "sea_isowari.json", 60 * 24, item).catch(() => null);
-  const opt = seaOptions(arg, seaFerryOf(isoData));
+  const isoP = getJSON(`${SEA.page}data/isowari.json`, "sea_isowari.json", 60 * 24, item).catch(() => null);
+  const opt = seaOptions(arg, seaFerryOf(readCache("sea_isowari.json") || (await isoP)));
   const place = await seaPlace(opt.place);
   const port = seaNearestPort(place);
   const la = place.lat.toFixed(2);
@@ -1177,9 +1179,9 @@ async function loadSea(arg, ctx, item) {
     return h * 60 + m;
   };
   const jma = jmaJson && areaJma ? seaJmaText(jmaJson, areaJma.c10) : {};
-  const island = seaIsland(isoData, place);
+  const island = seaIsland(await isoP, place);
   return {
-    iso: island ? { name: island.name, periods: island.periods, except: island.except || {}, pick: opt.ferries } : null,
+    iso: island ? { periods: island.periods, except: island.except, pick: opt.ferries } : null,
     name: place.name || (areaJma && areaJma.town) || `${la},${lo}`,
     lat: place.lat,
     lon: place.lon,
@@ -1223,6 +1225,8 @@ function seaHourIndex(d, now) {
   return Math.max(0, Math.round((now - new Date(`${d.day0}T00:00:00+09:00`)) / 3600000 - 0.5));
 }
 
+const seaMinute = (d, now) => (now - new Date(`${d.day0}T00:00:00+09:00`)) / 60000;
+
 function seaWindow(d, now) {
   const i = seaHourIndex(d, now);
   const from = Math.max(0, Math.min(24, Math.floor((i % 24) / 6) * 6 - 3 + Math.floor(i / 24) * 24));
@@ -1261,13 +1265,12 @@ function seaFocus(d, i, now) {
   if (top(d.winds) >= SEA.focus.windMs) return "wind";
   if (top(d.waves) >= SEA.focus.waveM) return "wave";
   const mz = seaNext(d, now).mazume;
-  const m = (now - new Date(`${d.day0}T00:00:00+09:00`)) / 60000;
-  if (tide && mz && mz.from - m <= 60) return "tide";
+  if (tide && mz && mz.from - seaMinute(d, now) <= 60) return "tide";
   return "wave";
 }
 
 function seaNext(d, now) {
-  const m = (now - new Date(`${d.day0}T00:00:00+09:00`)) / 60000;
+  const m = seaMinute(d, now);
   const tide = (d.tideMarks || []).find((t) => t.m >= m) || null;
   const spans = (d.sun || []).flatMap((s) => [
     { k: "朝まづめ", from: s.tw0, to: s.rise + 60 },

@@ -8,13 +8,13 @@ import { dayLabel, hm, hmText, hourlyPoints, sliceDay, tokyoParts } from "./js/t
 import { findPlace, km, placeContext } from "./js/place.js";
 import { loadForecasts, loadTide, tideFor, tideWaiting } from "./js/forecast.js";
 import { jmaWarnings } from "./js/jma.js";
-import { arrow, baseName, dirName, esc, fmt, meanDir, spread, rainCell, rainMmCell, range, tempCell, tideEvents, tideRange, valueAt, wxName, wxShort } from "./js/format.js";
+import { arrow, baseName, dirName, esc, fmt, icon, meanDir, rainCell, rainMmCell, range, spread, tempCell, tideEvents, tideRange, valueAt, wxName, wxShort } from "./js/format.js";
 import { dashSwatch, drawChart, legend, timeline, tlScroll } from "./js/chart.js";
 import { diaryNow, drawDiary, drawDiaryShell, initDiary } from "./js/diary.js";
 import { canCard, oqrnCardUrl, pageUrl } from "./js/card.js";
 import { mazume } from "./js/daydata.js";
 import { initMapPick, openMapPick } from "./js/mappick.js";
-import { ferriesOf, ferryStyle, isoOn, isoUntil, islandFor, loadIso, myFerries, setMyFerries } from "./js/iso.js";
+import { ferriesOf, ferryShort, ferryStyle, groupFirst, isoOn, isoUntil, islandFor, loadIso, myFerries, setMyFerries } from "./js/iso.js";
 
 // ---- 線 ----
 function windSeries(d) {
@@ -226,7 +226,6 @@ function render() {
 }
 
 // ---- まとめ・場所の行・送る ----
-const icon = name => `<span class="ls-icon is-text" data-icon="${name}" aria-hidden="true"></span>`;
 const GO = `<span class="go ls-icon" data-icon="next" aria-hidden="true"></span>`;
 // まとめの数字のカード（押すとその欄へ）
 const fact = ({ href, ic, title, value, unit = "", note = "", text = false }) =>
@@ -311,11 +310,10 @@ function isoHtml(v) {
   const today = isoOn(isl, v.day.ymd);
   const until = isoUntil(isl);
   const untilText = until ? `${Number(until.slice(5, 7))}月${Number(until.slice(8))}日` : "";
-  const short = g => g.split("・")[0];
   // 渡船のピル：船の色の丸・渡船の名前・その日の磯。押すと、いつもの渡船に入れる・外す（いくつでも）
   const pill = f => {
     const g = today?.find(x => x.ferry === f)?.group;
-    return `<button type="button" class="ls-chip is-small iso-pill" data-ferry="${esc(f)}" aria-pressed="${mine.includes(f)}"${ferryStyle(isl, f)}><i class="ferry-dot"></i><span class="iso-pill-ferry">${esc(f.replace(/渡船$/, ""))}</span>${g ? `<strong>${esc(g)}</strong>` : ""}</button>`;
+    return `<button type="button" class="ls-chip is-small iso-pill" data-ferry="${esc(f)}" aria-pressed="${mine.includes(f)}"${ferryStyle(isl, f)}><i class="ferry-dot"></i><span class="iso-pill-ferry">${esc(ferryShort(f))}</span>${g ? `<strong>${esc(g)}</strong>` : ""}</button>`;
   };
   const none = today ? "" : `<p class="muted small iso-none">${v.day.short}の磯割は、まだ発表されていません（${untilText}まで）。</p>`;
   const rows = Array.from({ length: DAYS }, (_, i) => {
@@ -324,7 +322,7 @@ function isoHtml(v) {
       wave: dayTop(d.waves?.hourly, WAVE_MODELS.map(k => `wave_height_${k}`), i),
       wind: dayTop(d.wind?.hourly, WIND_MODELS.map(k => `wind_speed_10m_${k}`), i) };
   });
-  const cell = (r, f) => { const x = r.iso?.find(y => y.ferry === f); return x ? esc(one ? x.group : short(x.group)) : "—"; };
+  const cell = (r, f) => { const x = r.iso?.find(y => y.ferry === f); return x ? esc(one ? x.group : groupFirst(x.group)) : "—"; };
   // 渡船の列は船の色でうすく塗る（磯割表と同じ色分け）
   const tint = f => { const st = ferryStyle(isl, f); return st ? ` class="is-ferry"${st}` : ""; };
   // qcheck-ok: W1 島のデータ（このリポジトリの data/isowari.json）は esc する
@@ -333,7 +331,7 @@ function isoHtml(v) {
     <div class="ls-chips iso-pills" role="group" aria-label="いつもの渡船（いくつでも）">${ferries.map(pill).join("")}</div>
     ${none}
     <div class="table-wrap"><table class="compact iso-days">
-      <thead><tr><th>日</th>${cols.map(f => `<th${tint(f)}>${one ? `${esc(f.replace("渡船", ""))}の磯` : esc(f.replace("渡船", ""))}</th>`).join("")}<th class="num">波 m</th><th class="num">風 m/s</th></tr></thead>
+      <thead><tr><th>日</th>${cols.map(f => `<th${tint(f)}>${esc(ferryShort(f))}${one ? "の磯" : ""}</th>`).join("")}<th class="num">波 m</th><th class="num">風 m/s</th></tr></thead>
       <tbody>${rows.map(r => `<tr data-iso-day="${r.i}" class="${r.i === state.day ? "on" : ""}"><th>${r.i < 2 ? r.day.text.replace(/（.）$/, "") : r.day.text.replace(/（(.)）$/, "$1")}</th>${cols.map(f => `<td${tint(f)}>${cell(r, f)}</td>`).join("")}<td class="num">${fmt(r.wave)}</td><td class="num">${fmt(r.wind)}</td></tr>`).join("")}</tbody>
     </table></div>
     <p class="muted small iso-note">波と風は、昼（5〜15時）の予報をならした値のいちばん大きいもの。行を押すとその日に。磯割は渡船の発表（${untilText}まで）を、毎日くり返す順番として出しています。当日の磯は渡船屋さんに確かめてください。</p>
@@ -386,8 +384,6 @@ function busy(text, { dim = false, button = "" } = {}) {
   st.classList.toggle("is-busy", text != null);
   if (text != null) st.textContent = text;
   document.body.classList.toggle("is-loading", text != null && dim);
-  // ボタンが見つからないとき（古いページのまま新しい app.js を読んだときなど）も、読みこみは止めない
-  if (!btn) return;
   btn.disabled = text != null && !!button;
   btn.classList.toggle("is-busy", text != null);
   btn.textContent = text != null && button ? button : "見る";
@@ -510,7 +506,7 @@ function drawHowto() {
   document.getElementById("howto-lead").textContent = `${S}（無料のアプリ）に、このページと同じ海の予報を出すスクリプトを入れて、ホーム画面に置きます。`;
   // 磯割のある島で、いつもの渡船を選んでいれば、その渡船も（ウィジェットの下の行に、その渡船の磯）
   const isl = islandFor(state.place);
-  const param = [placeParam(), ...myFerries(isl).map(f => f.replace(/渡船$/, ""))].join(",");
+  const param = [placeParam(), ...myFerries(isl).map(ferryShort)].join(",");
   document.getElementById("howto-steps").innerHTML = `
     <li>App Store で「${S}」を入れる（無料）。</li>
     <li>下のボタンでスクリプトをコピーする。
@@ -587,7 +583,24 @@ function initTabs() {
   showTab(fromHash || store.get("umiqru:tab") || TABS[0], !!fromHash);
 }
 
+// 日を選ぶ（今日はいまの時刻、ほかの日は6時から）
+function pickDay(i) {
+  state.day = i;
+  state.hour = i === 0 ? tokyoParts().hour : 6;
+  refreshTide();
+}
+
+// 前の版のページ（index.html）のまま新しい app.js を読んだときは、1回だけ読みなおす（新しい部品がないと動かないので）
+function staleHtml() {
+  if (document.getElementById("map-pick")) return false;
+  let tried = true;
+  try { tried = sessionStorage.getItem("umiqru:reloaded") === "1"; sessionStorage.setItem("umiqru:reloaded", "1"); } catch {}
+  if (!tried) location.reload();
+  return true;
+}
+
 function init() {
+  if (staleHtml()) return;
   state.render = render;
   // 電波がなくても、一度開いたページは開けるように（中身は Q キットの sw-core.js）
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
@@ -618,9 +631,7 @@ function init() {
   days.addEventListener("click", ev => {
     const b = ev.target.closest("button");
     if (!b) return;
-    state.day = Number(b.dataset.i);
-    state.hour = state.day === 0 ? tokyoParts().hour : 6;
-    refreshTide();
+    pickDay(Number(b.dataset.i));
   });
   state.hour = tokyoParts().hour;
   // 磯割：いつもの渡船を選ぶ・表の行でその日に
@@ -635,13 +646,10 @@ function init() {
       return;
     }
     const r = ev.target.closest("[data-iso-day]");
-    if (r && Number(r.dataset.isoDay) !== state.day) {
-      state.day = Number(r.dataset.isoDay);
-      state.hour = state.day === 0 ? tokyoParts().hour : 6;
-      refreshTide();
-    }
+    if (r && Number(r.dataset.isoDay) !== state.day) pickDay(Number(r.dataset.isoDay));
   });
-  loadIso().then(() => { render(); if (state.place) drawHowto(); });
+  // 島のデータが届いたら、いま島を見ているときだけ描きなおす
+  loadIso().then(() => { if (islandFor(state.place)) { render(); drawHowto(); } });
   document.querySelectorAll(".seg").forEach(seg => seg.addEventListener("click", ev => {
     const b = ev.target.closest("[data-dir]");
     if (!b || b.dataset.dir === state.windDir) return;

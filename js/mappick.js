@@ -2,6 +2,7 @@
 // 地図は国土地理院のタイル（標準・写真）を Leaflet で。Leaflet は窓を初めて開いたときだけ読む
 // 読まれるところ：app.js（検索欄の横の地図のボタン）
 import { NAMES } from "./names.js";
+import { closeDialog, icon, openDialog } from "./format.js";
 
 const LEAFLET = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/";
 const TILES = {
@@ -51,7 +52,7 @@ function setLayer(key) {
 export async function openMapPick(from, pick) {
   onPick = pick;
   const dlg = $("map-pick");
-  if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", "");
+  openDialog(dlg);
   $("map-name").value = "";
   $("map-note").textContent = "地図を読みこみ中…";
   let L;
@@ -72,7 +73,7 @@ export async function openMapPick(from, pick) {
   requestAnimationFrame(() => map.invalidateSize());
 }
 
-const close = () => { const dlg = $("map-pick"); if (dlg.close) dlg.close(); else dlg.removeAttribute("open"); };
+const close = () => closeDialog($("map-pick"));
 
 // 窓の中身（index.html の #map-pick に入れる）と、ボタンの動き
 export function initMapPick(copy) {
@@ -80,7 +81,7 @@ export function initMapPick(copy) {
   dlg.innerHTML = `<div class="viewer-in map-in">
     <div class="viewer-bar">
       <strong>地図で選ぶ</strong>
-      <button type="button" class="ls-icon-button" data-map-close aria-label="閉じる"><span class="ls-icon" data-icon="close" aria-hidden="true"></span></button>
+      <button type="button" class="ls-icon-button" data-map-close aria-label="閉じる">${icon("close")}</button>
     </div>
     <div class="ls-chips" id="map-layer" role="group" aria-label="地図の種類">
       ${Object.entries(TILES).map(([k, t]) => `<button type="button" class="ls-chip" data-layer="${k}" aria-pressed="${k === "std"}">${t.label}</button>`).join("")}
@@ -89,9 +90,9 @@ export function initMapPick(copy) {
     <p class="muted small" id="map-note"></p>
     <p class="map-ll"><span class="sub small">緯度, 経度</span> <strong id="map-ll">—</strong></p>
     <label class="map-name"><span class="sub small">名前（なくてもよい。磯の名前など）</span>
-      <input type="text" id="map-name" maxlength="30" placeholder="例：グンカン" enterkeyhint="go"></label>
+      <input type="text" class="ls-input" id="map-name" maxlength="30" placeholder="例：グンカン" enterkeyhint="go"></label>
     <div class="ls-grid-2">
-      <button type="button" class="ls-button" id="map-copy" disabled><span class="ls-icon" data-icon="copy" aria-hidden="true"></span>コピー</button>
+      <button type="button" class="ls-button" id="map-copy" disabled>${icon("copy")}コピー</button>
       <button type="button" class="ls-button is-primary" id="map-go" disabled>ここを見る</button>
     </div>
   </div>`;
