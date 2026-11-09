@@ -9,6 +9,7 @@ import { arrow, dirName, esc, fmt, spread, wxShort } from "./format.js";
 import { diaryDb } from "./diary-db.js";
 import { canCard, oqrnCardUrl, pageUrl } from "./card.js";
 import { atTime, canKeepDay, dayIndex, getDay } from "./daydata.js";
+import { IN_APP, IS_PHONE, canPrompt, onInstallChange, promptInstall, reasonText, shouldInstall, standalone, stepsHtml } from "./install.js";
 
 // 見た海のようす（1つずつ選ぶ。もう一度押すと外れる）と、したこと（いくつでも）
 const SAW = [
@@ -19,14 +20,6 @@ const SAW = [
 const DID = ["釣り", "サーフィン", "磯あそび", "散歩", "ほか"];
 const PHOTO_PX = 1600; // 写真は長い辺をここまで小さくして残す
 const EXPORT_TAG = "umiqru-diary";
-
-// どこで開いているか（日記はブラウザごとに別の場所に残るので、注意を出す）
-const UA = navigator.userAgent;
-const IN_LINE = /\bLine\//i.test(UA);
-const IN_APP = IN_LINE || /FBAN|FBAV|Instagram|Twitter/i.test(UA);
-const IS_IOS = /iPhone|iPad|iPod/.test(UA) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-const IS_PHONE = IS_IOS || /Android/.test(UA);
-const STANDALONE = navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
 
 // app.js が入れるもの：いま見ている場所・日時（render のたびに）、ページを動かす関数
 let now = null;
@@ -39,6 +32,7 @@ let editYmd = null; // なおす前の日にち（変えたら、その日の予
 let items = []; // 書いている日記の写真・釣果 { id, at, photo, fish, count, size }
 let fresh = new Map(); // まだ残していない写真の id → { type, buf }
 let dropped = []; // 書いている日記から外した、残してあった写真の id
+let asked = false; // 「書く」の前に、ホーム画面に置く案内を出したか（開くたびに1回）
 let viewing = null; // 写真を大きく見ているとき { e, steps, i }
 const urls = new Map(); // 写真の id → 画面に出す URL
 const records = new Map(); // 写真の id → { type, buf }（共有するとき、押してすぐ写真を渡せるように）
@@ -78,6 +72,7 @@ export function initDiary(h) {
   month = selected.slice(0, 7);
   box().addEventListener("click", onClick);
   box().addEventListener("change", onChange);
+  onInstallChange(drawWhere);
   load();
 }
 // render のたびに：いま見ている場所・日時
@@ -97,6 +92,7 @@ export function drawDiary() {
 async function load() {
   try { entries = await diaryDb.all(); } catch { entries = []; }
   drawDiary();
+  drawWhere();
 }
 
 // ---- カレンダー ----
@@ -144,7 +140,7 @@ function drawDay() {
   const list = groupByDay()[selected] || [];
   // qcheck-ok: W1 日記の中身は entryHtml で esc する
   el.innerHTML = `<h3 class="diary-day-title">${ymdText(selected)}</h3>
-    ${list.length ? list.map(entryHtml).join("") : `<p class="muted small" style="margin:0">この日の日記はありません。</p>`}`;
+    ${list.length ? list.map(entryHtml).join("") : `<p class="muted small" style="margin:0">この日の日記はありません。${standalone() && !entries.length ? "Safari などで書いた日記は、そちらで「書き出す」→ ここで「読みこむ」で移せます（下の「週のはじまり・書き出し」）。" : ""}</p>`}`;
   fillPhotos(el);
   // 1日の表は、はじめの時刻のあたりから見えるように
   el.querySelectorAll(".day-table").forEach(w => { w.scrollLeft = Math.max(0, Number(w.dataset.from) - 1) * 40; });
@@ -570,10 +566,17 @@ async function onClick(ev) {
   if (!t) {
     // 写真を見ているとき、窓の外を押したら閉じる
     if (ev.target.id === "diary-viewer") closeViewer();
+    if (ev.target.id === "diary-install") closeInstall();
     return;
   }
   const d = t.dataset;
-  if (t.id === "diary-new") startEdit();
+  if (t.id === "diary-new") {
+    if (shouldInstall() && !asked) { asked = true; openInstall(); }
+    else startEdit();
+  } else if ("installGo" in d) {
+    if (await promptInstall()) closeInstall();
+  } else if ("installSkip" in d) { closeInstall(); startEdit(); }
+  else if ("installClose" in d) closeInstall();
   else if (d.month) {
     const [y, m] = month.split("-").map(Number);
     const n = new Date(Date.UTC(y, m - 1 + Number(d.month), 1));
@@ -756,21 +759,42 @@ function drawWeekSeg() {
   const ws = weekStart();
   document.querySelectorAll("[data-week]").forEach(b => b.setAttribute("aria-pressed", String(Number(b.dataset.week) === ws)));
 }
-// どこに残るかの注意。アプリの中のブラウザ（LINE など）は、そのアプリの中にだけ残る。iPhone の Safari は、ホーム画面に置くと消えにくい
-function whereHtml() {
-  if (IN_APP) {
-    const u = new URL(location.href);
-    u.searchParams.set("openExternalBrowser", "1"); // LINE で開いたとき、ふだんのブラウザで開きなおす
-    return `<div class="alert diary-where">${icon("warn")}<div><strong>アプリの中のブラウザで開いています</strong><br>
-      ここで書いた日記は、このアプリの中にだけ残り、Safari などからは見えません。アプリのキャッシュを消すと消え、書き出しもできないことがあります。
-      ${IN_LINE ? `<br><a href="${esc(u.href)}">ふだんのブラウザで開く</a>` : "<br>メニューから「ブラウザで開く」を選んでください。"}</div></div>`;
-  }
-  if (IS_IOS && !STANDALONE) {
-    return `<div class="alert diary-where">${icon("tip")}<div><strong>ホーム画面に置いて使うのがおすすめ</strong><br>
-      Safari のままだと、しばらく開かないと日記が消えることがあります。共有ボタン →「ホーム画面に追加」で置き、そこから開いてください。
-      ホーム画面のほうは Safari と別の保存場所なので、ここで書いた日記は「書き出す」→ ホーム画面のほうで「読みこむ」で移せます。</div></div>`;
-  }
-  return "";
+// ホーム画面に置く案内（日記タブの上）。置き方の手順と、いまある日記の移し方
+function drawWhere() {
+  const el = document.getElementById("diary-where");
+  if (!el) return;
+  if (!shouldInstall()) { el.hidden = true; el.innerHTML = ""; return; }
+  el.hidden = false;
+  const n = entries.length;
+  // qcheck-ok: W1 決まった文字と、esc したこのページの URL だけ
+  el.innerHTML = `${icon(IN_APP ? "warn" : "tip")}<div class="where-in">
+    <strong>日記は、ホーム画面のうみくるで書くのがおすすめ</strong>
+    <p>${reasonText()}</p>
+    <ol class="where-steps">${stepsHtml(icon, esc)}</ol>
+    ${canPrompt() ? `<button type="button" class="ls-button is-primary" data-install-go>${icon("add")}ホーム画面に追加</button>` : ""}
+    ${n ? `<p>ここにある日記 ${n}件は、ホーム画面のうみくるには自動で移りません（保存の場所が別）。先に書き出して、ホーム画面のうみくるの「読みこむ」で移してください。</p>
+      <button type="button" class="ls-button" data-export>${icon("backup")}${n}件を書き出す</button>` : ""}
+  </div>`;
+}
+function openInstall() {
+  const dlg = document.getElementById("diary-install");
+  // qcheck-ok: W1 決まった文字と、esc したこのページの URL だけ
+  dlg.innerHTML = `<div class="viewer-in">
+    <div class="viewer-bar"><strong>先にホーム画面に置きませんか？</strong>
+      <button type="button" class="ls-icon-button" data-install-close aria-label="閉じる">${icon("close")}</button></div>
+    <p class="small">${reasonText()}</p>
+    <ol class="where-steps small">${stepsHtml(icon, esc)}</ol>
+    ${canPrompt() ? `<button type="button" class="ls-button is-primary" data-install-go>${icon("add")}ホーム画面に追加</button>` : ""}
+    <div class="ls-grid-2 viewer-nav">
+      <button type="button" class="ls-button" data-install-close>置きに行く</button>
+      <button type="button" class="ls-button" data-install-skip>このまま書く</button>
+    </div>
+  </div>`;
+  if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", "");
+}
+function closeInstall() {
+  const dlg = document.getElementById("diary-install");
+  if (dlg?.open) { if (dlg.close) dlg.close(); else dlg.removeAttribute("open"); }
 }
 export function drawDiaryShell() {
   // qcheck-ok: W1 決まった文字と、esc したこのページの URL だけ
@@ -780,11 +804,12 @@ export function drawDiaryShell() {
       <button type="button" class="ls-button" id="diary-new"${now ? "" : " disabled"}>${icon("edit")}書く</button>
     </div>
     <p class="muted small diary-lead">写真・釣果を時刻つきで残すと、その時刻の潮位・上げ下げ・風・波がいっしょに見られます。その日1日ぶんの予報・潮も残すので、あとでくらべて次の日えらびに。</p>
-    ${whereHtml()}
+    <div class="alert diary-where" id="diary-where" hidden></div>
     <div id="diary-form" class="diary-form" hidden></div>
     <div id="diary-cal"></div>
     <div id="diary-day"></div>
     <dialog id="diary-viewer" class="viewer" aria-label="写真とその時刻の値"></dialog>
+    <dialog id="diary-install" class="viewer" aria-label="ホーム画面に置く"></dialog>
     <details class="diary-keep">
       <summary>週のはじまり・書き出し</summary>
       <div class="diary-keep-row"><span class="small sub">週のはじまり</span>

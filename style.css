@@ -328,7 +328,12 @@ dialog.viewer::backdrop { background: rgba(0, 0, 0, 0.6); }
 .viewer-title { margin: 0; font-weight: 700; }
 .viewer-nav { margin-top: 8px; }
 .diary-where { margin-bottom: 16px; }
-.diary-where a { color: inherit; }
+.diary-where[hidden] { display: none; }
+.diary-where a { color: inherit; font-weight: 700; }
+.where-in { display: grid; gap: 8px; justify-items: start; min-width: 0; }
+.where-in p { margin: 0; }
+.where-steps { margin: 0; padding-left: 24px; display: grid; gap: 4px; }
+.where-steps .ls-icon { vertical-align: -0.15em; }
 .entry-actions { display: flex; gap: 8px; }
 .entry-actions .ls-button { min-height: 32px; font-size: 13px; padding: 0 16px; }
 
