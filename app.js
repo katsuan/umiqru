@@ -329,8 +329,8 @@ function isoHtml(v) {
       <thead><tr><th>日</th>${cols.map(f => `<th>${mine ? "磯" : esc(f.replace("渡船", ""))}</th>`).join("")}<th class="num">波 m</th><th class="num">風 m/s</th></tr></thead>
       <tbody>${rows.map(r => `<tr data-iso-day="${r.i}" class="${r.i === state.day ? "on" : ""}"><th>${r.i < 2 ? r.day.text.replace(/（.）$/, "") : r.day.text.replace(/（(.)）$/, "$1")}</th>${cols.map(f => `<td>${cell(r, f)}</td>`).join("")}<td class="num">${fmt(r.wave)}</td><td class="num">${fmt(r.wind)}</td></tr>`).join("")}</tbody>
     </table></div>
-    <p class="muted small iso-note">波と風は、昼（5〜15時）の予報をならした値のいちばん大きいもの。行を押すとその日に。磯割は渡船の発表（${untilText}まで）を、毎日くり返す順番として出しています。当日の磯は渡船屋さんに確かめてください。
-      出どころ：${isl.sources.map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.name)}</a>`).join("・")}</p>
+    <p class="muted small iso-note">波と風は、昼（5〜15時）の予報をならした値のいちばん大きいもの。行を押すとその日に。磯割は渡船の発表（${untilText}まで）を、毎日くり返す順番として出しています。当日の磯は渡船屋さんに確かめてください。</p>
+    <p class="muted small iso-note">出どころ：${isl.sources.map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.name)}</a>`).join("・")}</p>
   </div>`;
 }
 
