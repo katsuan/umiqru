@@ -8,7 +8,7 @@
 // 新しい版が出ると通知で知らせます。入れかえ方は https://katsuan.github.io/umiqru/#howto
 // ======================================
 
-const SEA_BUILD = "c3d868f0b3";
+const SEA_BUILD = "5bfc3c51c7";
 
 const PALETTE = {
   brand: "#6C47FF",
@@ -1104,8 +1104,27 @@ function seaIsoLine(d, now) {
   if (!list) return null;
   const pick = d.iso.pick && d.iso.pick.length ? list.filter((x) => d.iso.pick.includes(x.ferry)) : list;
   if (!pick.length) return null;
-  const items = pick.map((x) => ({ color: x.color, text: `${seaFerryShort(x.ferry)} ${pick.length === 1 ? x.group : x.group.split("・")[0]}` }));
-  return { when: tomorrow ? "あす" : "", items };
+  const item = (x, full) => ({ color: x.color, text: `${seaFerryShort(x.ferry)} ${full ? x.group : x.group.split("・")[0]}` });
+  return { when: tomorrow ? "あす" : "", full: pick.map((x) => item(x, true)), short: pick.map((x) => item(x, pick.length === 1)) };
+}
+
+function seaIsoDraw(row, iso, width, theme) {
+  const need = (list) => list.reduce((a, x) => a + textWidth(x.text, 9) + 18, iso.when ? textWidth(iso.when, 9) + 8 : 0);
+  const items = need(iso.full) <= width ? iso.full : iso.short;
+  let used = 0;
+  if (iso.when) { txt(row, iso.when, 9, theme.sub, "semibold", { scale: 0.7 }); used += textWidth(iso.when, 9) + 8; }
+  items.forEach((x) => {
+    const n = textWidth(x.text, 9) + 18;
+    if (used + n > width) return;
+    used += n;
+    const dot = row.addStack();
+    dot.layoutHorizontally();
+    dot.spacing = 2;
+    dot.centerAlignContent();
+    txt(dot, "●", 7, x.color ? new Color(x.color) : theme.sub);
+    txt(dot, x.text, 9, theme.text, "semibold", { scale: 0.7 });
+  });
+  return used;
 }
 
 async function loadSea(arg, ctx, item) {
@@ -1537,7 +1556,9 @@ defineCard("sea", {
     const wxLine = big && wide && j && j.weather;
     if (wxLine) txt(box, `${SEA.names.jma} ${j.weather}`, 10, theme.sub, "semibold", { scale: 0.6 });
 
-    const footH = 14;
+    const iso = seaIsoLine(d, now);
+    const isoRow = !!iso && wide;
+    const footH = isoRow ? 28 : 14;
     const axisH = 11;
     const legendH = 12;
     const room = h - (big && wide ? 54 + (wxLine ? 14 : 0) : wide ? 46 : 58) - footH - axisH;
@@ -1601,26 +1622,16 @@ defineCard("sea", {
       });
     }
     box.addSpacer();
+    if (isoRow) {
+      seaIsoDraw(hrow(box, 8), iso, w, theme);
+      box.addSpacer(2);
+    }
     const foot = hrow(box, 8);
     const gust = (d.gust || [])[i];
     const cur = d.current && d.current.kn[i] != null ? `流れ ${d.current.dir[i] == null ? "" : `${seaDirText(d, d.current.dir[i])}へ`}${d.current.kn[i].toFixed(1)}kn` : "";
     const parts = [next.tide && next.tide.text, next.mazume && (next.mazume.now ? `いま${next.mazume.k}` : next.mazume.text), gust != null ? `突風 ${gust}m/s` : "", cur, (d.sst || [])[i] != null && w >= 280 ? `水温 ${Math.round(d.sst[i])}℃` : ""].filter(Boolean);
     let left = w;
-    const iso = seaIsoLine(d, now);
-    if (iso) {
-      if (iso.when) { txt(foot, iso.when, 9, theme.sub, "semibold", { scale: 0.7 }); left -= textWidth(iso.when, 9) + 8; }
-      iso.items.forEach((x) => {
-        const need = textWidth(x.text, 9) + 18;
-        if (need > left) return;
-        left -= need;
-        const dot = foot.addStack();
-        dot.layoutHorizontally();
-        dot.spacing = 2;
-        dot.centerAlignContent();
-        txt(dot, "●", 7, x.color ? new Color(x.color) : theme.sub);
-        txt(dot, x.text, 9, theme.text, "semibold", { scale: 0.7 });
-      });
-    }
+    if (iso && !isoRow) left -= seaIsoDraw(foot, iso, left, theme);
     parts.forEach((p) => {
       if (textWidth(p, 9) + 8 > left) return;
       left -= textWidth(p, 9) + 8;
