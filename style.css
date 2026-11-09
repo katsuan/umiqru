@@ -363,11 +363,6 @@ details.diary-keep p { margin: 8px 0 0; }
 .iso { display: grid; gap: 8px; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--grid); min-width: 0; }
 .iso-title { margin: 0; font-size: 15px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .iso-title .ls-icon { vertical-align: -0.15em; }
-.iso-big { margin: 0; display: grid; gap: 0; }
-.iso-big strong { font-size: 24px; }
-.iso-list { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 16px; margin: 0; font-size: 14px; }
-.iso-list dt { color: var(--text-3); }
-.iso-list dd { margin: 0; font-weight: 700; }
 .iso-none { margin: 0; }
 table.iso-days { margin-top: 0; }
 table.iso-days th, table.iso-days td { white-space: nowrap; padding: 4px 6px 4px 0; text-align: left; }
@@ -383,5 +378,11 @@ table.iso-days tbody tr.on th, table.iso-days tbody tr.on td { font-weight: 700;
 table.iso-days .is-ferry { background: color-mix(in srgb, var(--ferry) 28%, var(--surface)); padding-left: 6px; }
 table.iso-days thead .is-ferry { background: color-mix(in srgb, var(--ferry) 45%, var(--surface)); }
 table.iso-days tbody tr.on .is-ferry { background: color-mix(in srgb, var(--ferry) 50%, var(--surface)); }
-.iso-big.is-ferry { border-left: 6px solid var(--ferry); padding-left: 12px; }
 .iso-src { margin: 4px 0 0; padding-left: 16px; display: grid; gap: 4px; }
+/* 渡船のピル：丸・渡船の名前・その日の磯（選んだものは枠が濃い） */
+.iso-pills { gap: 8px; }
+.iso-pill { display: inline-flex; align-items: center; gap: 4px; }
+.iso-pill .ferry-dot { margin-right: 2px; }
+.iso-pill-ferry { color: var(--text-2); }
+.iso-pill strong { font-weight: 700; color: var(--text); }
+.iso-pill[aria-pressed="true"] { background: color-mix(in srgb, var(--ferry) 30%, var(--surface)); }
