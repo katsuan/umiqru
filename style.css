@@ -384,3 +384,4 @@ table.iso-days .is-ferry { background: color-mix(in srgb, var(--ferry) 28%, var(
 table.iso-days thead .is-ferry { background: color-mix(in srgb, var(--ferry) 45%, var(--surface)); }
 table.iso-days tbody tr.on .is-ferry { background: color-mix(in srgb, var(--ferry) 50%, var(--surface)); }
 .iso-big.is-ferry { border-left: 6px solid var(--ferry); padding-left: 12px; }
+.iso-src { margin: 4px 0 0; padding-left: 16px; display: grid; gap: 4px; }

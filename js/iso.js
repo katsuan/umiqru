@@ -35,6 +35,12 @@ export const spotsOf = island => [...new Set((island?.periods || []).flatMap(p =
 // 発表のある、いちばん先の日
 export const isoUntil = island => (island?.periods || []).map(p => p.to).sort().pop() || null;
 
-// いつもの渡船（島ごとに、この端末に覚える）
-export const myFerry = island => island ? store.get(`umiqru:ferry:${island.id}`) : null;
-export const setMyFerry = (island, name) => store.set(`umiqru:ferry:${island.id}`, name);
+// いつもの渡船（島ごとに、この端末に覚える。いくつでも。前の形の1つだけの値も読む）
+export function myFerries(island) {
+  if (!island) return [];
+  const v = store.get(`umiqru:ferry:${island.id}`), names = ferriesOf(island);
+  return (Array.isArray(v) ? v : v ? [v] : []).filter(n => names.includes(n));
+}
+export const setMyFerries = (island, list) => store.set(`umiqru:ferry:${island.id}`, list);
+// 日記に先に入れる渡船（いつもの渡船が1つだけのとき）
+export const myFerry = island => { const m = myFerries(island); return m.length === 1 ? m[0] : null; };
