@@ -380,6 +380,7 @@ function busy(text, { dim = false, button = "" } = {}) {
   if (text != null) st.textContent = text;
   document.body.classList.toggle("is-loading", text != null && dim);
   btn.disabled = text != null && !!button;
+  btn.classList.toggle("is-busy", text != null);
   btn.textContent = text != null && button ? button : "見る";
 }
 // 終わりの知らせ（少しして消す）
@@ -388,7 +389,8 @@ function doneNote(text, keep = false) {
   statusEl().textContent = text;
   if (!keep) doneTimer = setTimeout(() => { statusEl().textContent = ""; }, 2500);
 }
-async function go(place) {
+// ask … さがして開いたとき。同じ名前のほかの場所があれば、トーストで知らせる
+async function go(place, { ask = false } = {}) {
   const name = place.alts ? baseName(place.name) : place.name;
   busy(`${name}を読みこみ中…`, { dim: true });
   try {
@@ -413,6 +415,7 @@ async function go(place) {
     const names = { wx: "天気", wind: "風", msm: state.ctx.jma ? "風（MSM）" : null, waves: "波", sea: "水温・海流・海面", jma: `${NAMES.jma}の予報`, amedas: NAMES.amedas, warn: `${NAMES.jma}の警報` };
     const errs = data.errors.map(k => names[k]).filter(Boolean);
     doneNote(errs.length ? `読めなかったもの：${errs.join("・")}` : `${name}を表示しました`, errs.length > 0);
+    if (ask && place.alts?.length) altsToast(place);
   } catch (e) {
     doneNote("読みこめませんでした。通信を確かめてください。", true);
   }
@@ -449,6 +452,15 @@ placeInfo.addEventListener("click", ev => {
   const { alts, ...me } = cur;
   go({ ...a, alts: [me, ...alts.filter(x => x !== a)] });
 });
+// 同じ名前のほかの場所があることを、トーストで（Q キット）。押すと、えらびなおす欄を開く
+function altsToast(place) {
+  if (state.place !== place) return; // とちゅうでほかの場所に変えたとき
+  const n = place.alts.length;
+  window.LineShareUI?.toast(`ほかにも「${baseName(place.name)}」が${n}か所あります。いまは ${placeTitle()}`, {
+    actionLabel: "えらびなおす", ms: 8000,
+    onAction: () => { altsOpen = true; render(); placeInfo.scrollIntoView({ block: "start", behavior: "smooth" }); },
+  });
+}
 function drawRecent() {
   const list = store.get("umiqru:recent") || [];
   const el = document.getElementById("recent");
@@ -571,7 +583,7 @@ function init() {
     ev.preventDefault();
     if (!input.value.trim()) { doneNote("場所を入れてください（港・地名・緯度経度）"); input.focus(); return; }
     busy(`「${input.value.trim()}」をさがしています…`, { button: "さがし中…" });
-    try { const p = await findPlace(input.value); input.value = ""; input.blur(); go(p); }
+    try { const p = await findPlace(input.value); input.value = ""; input.blur(); go(p, { ask: true }); }
     catch (e) { doneNote(e.message, true); }
   });
   document.getElementById("here").addEventListener("click", () => {
@@ -671,7 +683,7 @@ function init() {
   // 最近見た場所と同じリンクなら、覚えている場所（同じ名前のほかの候補つき）で開く
   const known = q && (store.get("umiqru:recent") || []).find(p => placeParam(p) === q);
   if (known) go(known);
-  else if (q) findPlace(q).then(go).catch(e => { doneNote(e.message, true); });
+  else if (q) findPlace(q).then(p => go(p, { ask: true })).catch(e => { doneNote(e.message, true); });
   else if (last) go(last);
   else findPlace(DEFAULT_PLACE).then(go).catch(e => { doneNote(e.message, true); });
 }

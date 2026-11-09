@@ -130,13 +130,20 @@
   .status { font-size: 13px; color: var(--text-3); margin: 0 0 16px; }
   /* 読みこみが終わって文がないときは、場所を取らない（空の行を残さない） */
   .status:empty { margin: 0; }
-  /* 読みこみ中：字を少し濃く、下に動く線。前の場所の表示はうすく */
-  .status.is-busy { position: relative; color: var(--text-2); font-size: 14px; padding-bottom: 8px; }
-  .status.is-busy::after { content: ""; position: absolute; left: 0; bottom: 0; width: 30%; height: 2px; border-radius: 2px; background: var(--text-2); animation: status-run 1.2s ease-in-out infinite; }
-  @keyframes status-run { from { left: 0; } 50% { left: 70%; } to { left: 0; } }
-  @media (prefers-reduced-motion: reduce) { .status.is-busy::after { animation: none; width: 100%; opacity: 0.3; } }
-  body.is-loading :is(#place-info, #alert, main .card, #tabs) { opacity: 0.4; transition: opacity 0.2s; }
-  #place-go:disabled { opacity: 0.7; cursor: wait; }
+  /* 読みこみ中：ボタンに回る輪、知らせの行の下に流れる線、前の場所の表示はゆっくり明るく暗く */
+  .status.is-busy { position: relative; overflow: hidden; color: var(--text); font-size: 14px; font-weight: 700; padding-bottom: 8px; }
+  .status.is-busy::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; border-radius: 2px; background: var(--band); }
+  .status.is-busy::after { content: ""; position: absolute; left: 0; bottom: 0; width: 40%; height: 4px; border-radius: 2px; background: var(--accent); animation: status-run 1s linear infinite; }
+  @keyframes status-run { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+  #place-go.is-busy::before { content: ""; width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  body.is-loading :is(#place-info, #alert, main .card, #tabs) { animation: dim-pulse 1.2s ease-in-out infinite; }
+  @keyframes dim-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.65; } }
+  @media (prefers-reduced-motion: reduce) {
+    .status.is-busy::after, #place-go.is-busy::before { animation: none; }
+    body.is-loading :is(#place-info, #alert, main .card, #tabs) { animation: none; opacity: 0.4; }
+  }
+  #place-go:disabled { cursor: wait; }
   .tides { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 14px; color: var(--text-2); margin-top: 8px; }
   details.howto summary { cursor: pointer; font-weight: 700; font-size: 16px; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   details.howto summary::-webkit-details-marker { display: none; }
