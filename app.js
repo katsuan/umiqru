@@ -527,6 +527,7 @@ function drawHowto() {
       <tr><td><code class="param">城ヶ島</code></td><td class="wrap">港の名前・地名で</td></tr>
       <tr><td><code class="param">20.4253,136.0814</code></td><td class="wrap">緯度・経度で（日本の外も）</td></tr>
       <tr><td><span class="muted">（空）</span></td><td class="wrap">今いる場所</td></tr>
+      <tr><td><code class="param">城ヶ島</code><span class="muted">（小）</span></td><td class="wrap">小は、そのとき大事な1つ（強風・波浪の注意報、強い風・高い波、まづめの前後なら潮、ふだんは波）</td></tr>
       <tr><td><code class="param">城ヶ島,wave,wind</code></td><td class="wrap">書いたものだけを書いた順に（wave 波・tide 潮・wind 風）</td></tr>
       <tr><td><code class="param">城ヶ島,wind,deg</code></td><td class="wrap">風のグラフだけ・向きを角度で</td></tr>
       <tr><td><code class="param">鵜来島,家中</code></td><td class="wrap">磯割のある島は、大・中の下の行に渡船ごとの磯（12時からはあすのぶん）。渡船の名前を書くと、その渡船だけ（いくつでも）</td></tr>

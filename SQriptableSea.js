@@ -8,7 +8,7 @@
 // 新しい版が出ると通知で知らせます。入れかえ方は https://katsuan.github.io/umiqru/#howto
 // ======================================
 
-const SEA_BUILD = "f2cf0b0868";
+const SEA_BUILD = "056968fccd";
 
 const PALETTE = {
   brand: "#6C47FF",
@@ -897,6 +897,7 @@ const SEA = {
     "10": "大雨注意報", "14": "雷注意報", "15": "強風注意報", "16": "波浪注意報", "19": "高潮注意報", "20": "濃霧注意報",
     "32": "暴風雪特別警報", "33": "大雨特別警報", "35": "暴風特別警報", "37": "波浪特別警報", "38": "高潮特別警報",
   },
+  focus: { hours: 6, windMs: 10, waveM: 2 },
   dirs: ["北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東", "南", "南南西", "南西", "西南西", "西", "西北西", "北西", "北北西"],
 };
 
@@ -1243,6 +1244,28 @@ function seaRange(list, i) {
   return { lo, hi, n: v.length, text: v.length > 1 && f(lo) !== f(hi) ? `${f(lo)}〜${f(hi)}` : f(hi) };
 }
 
+function seaFocus(d, i, now) {
+  const warns = d.warns || [];
+  const tide = !!(d.tide && d.tide.length);
+  if (warns.some((w) => /強風|暴風/.test(w))) return "wind";
+  if (warns.some((w) => /高潮/.test(w)) && tide) return "tide";
+  if (warns.some((w) => /波浪/.test(w))) return "wave";
+  const top = (list) => {
+    let hi = null;
+    for (let k = i; k <= i + SEA.focus.hours; k++) {
+      const r = seaRange(list, k);
+      if (r && (hi == null || r.hi > hi)) hi = r.hi;
+    }
+    return hi == null ? 0 : hi;
+  };
+  if (top(d.winds) >= SEA.focus.windMs) return "wind";
+  if (top(d.waves) >= SEA.focus.waveM) return "wave";
+  const mz = seaNext(d, now).mazume;
+  const m = (now - new Date(`${d.day0}T00:00:00+09:00`)) / 60000;
+  if (tide && mz && mz.from - m <= 60) return "tide";
+  return "wave";
+}
+
 function seaNext(d, now) {
   const m = (now - new Date(`${d.day0}T00:00:00+09:00`)) / 60000;
   const tide = (d.tideMarks || []).find((t) => t.m >= m) || null;
@@ -1448,7 +1471,7 @@ defineCard("sea", {
   icon: "🌊",
   label: "海",
   aliases: ["umi", "marine", "海", "波", "釣り"],
-  help: `波・風・潮をグラフで（sea:城ヶ島 / sea:20.4253,136.0814 / 空なら今いる場所 / sea:城ヶ島,wave,wind で出すものを選ぶ（wave 波・tide 潮・wind 風） / deg で風の向きを角度に / 磯割のある島（鵜来島）は、下の行に渡船ごとのその日の磯（12時からはあす）。sea:鵜来島,家中 で渡船を選ぶ（いくつでも）。アプリの「🌊 海の Parameter を作る」で作れる）。${SEA.names.jma}の波の文と警報・注意報、近い港の${SEA.names.tide}を先に、緯度経度で読む波4つ・風4つの予報をあとに。押すと${SEA.names.page}が開く`,
+  help: `波・風・潮をグラフで（sea:城ヶ島 / sea:20.4253,136.0814 / 空なら今いる場所 / sea:城ヶ島,wave,wind で出すものを選ぶ（wave 波・tide 潮・wind 風） / deg で風の向きを角度に / 小で出すものを書かなければ、そのとき大事な1つ（警報・強い風・高い波・まづめ） / 磯割のある島（鵜来島）は、下の行に渡船ごとのその日の磯（12時からはあす）。sea:鵜来島,家中 で渡船を選ぶ（いくつでも）。アプリの「🌊 海の Parameter を作る」で作れる）。${SEA.names.jma}の波の文と警報・注意報、近い港の${SEA.names.tide}を先に、緯度経度で読む波4つ・風4つの予報をあとに。押すと${SEA.names.page}が開く`,
   keep: (d) => d,
   load: loadSea,
   refreshAt(d, ctx) {
@@ -1587,7 +1610,7 @@ defineCard("sea", {
       }
     };
     const chosen = d.opt && d.opt.show && d.opt.show.length ? d.opt.show : null;
-    const auto = (big ? ["tide", "wave", "wind"] : wide ? ["tide", "wave"] : ["wave"]).filter((g) => g !== "tide" || d.tide.length || !wide);
+    const auto = (big ? ["tide", "wave", "wind"] : wide ? ["tide", "wave"] : [seaFocus(d, i, now)]).filter((g) => g !== "tide" || d.tide.length || !wide);
     const items = chosen || auto;
     box.addSpacer(4);
     if (room < legendH + 16) {
