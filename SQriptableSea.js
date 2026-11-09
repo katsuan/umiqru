@@ -8,7 +8,7 @@
 // 新しい版が出ると通知で知らせます。入れかえ方は https://katsuan.github.io/umiqru/#howto
 // ======================================
 
-const SEA_BUILD = "ac9b23079e";
+const SEA_BUILD = "c3d868f0b3";
 
 const PALETTE = {
   brand: "#6C47FF",
@@ -1054,9 +1054,10 @@ async function seaOffshore(place, hourly, empty, q) {
 
 const SEA_SHOW = { wave: "wave", 波: "wave", tide: "tide", 潮: "tide", wind: "wind", 風: "wind" };
 
-function seaOptions(arg) {
+function seaOptions(arg, isFerry = () => null) {
   const show = [];
   const rest = [];
+  const ferries = [];
   let deg = false;
   String(arg || "").split(",").map((w) => w.trim()).filter(Boolean).forEach((w) => {
     const k = w.toLowerCase();
@@ -1064,13 +1065,52 @@ function seaOptions(arg) {
       if (!show.includes(SEA_SHOW[k])) show.push(SEA_SHOW[k]);
     } else if (k === "deg" || k === "角度") deg = true;
     else if (k === "16" || k === "16方位") deg = false;
+    else if (isFerry(w)) ferries.push(isFerry(w));
     else rest.push(w);
   });
-  return { place: rest.join(","), show, deg };
+  return { place: rest.join(","), show, deg, ferries };
+}
+
+const seaFerryShort = (name) => String(name).replace(/渡船$/, "");
+
+function seaFerryOf(data) {
+  const names = ((data && data.islands) || []).flatMap((s) => (s.periods || []).flatMap((p) => p.ferries.map((f) => f.name)));
+  return (w) => names.find((n) => n === w || seaFerryShort(n) === w) || null;
+}
+
+function seaIsland(data, place) {
+  let best = null;
+  let bd = Infinity;
+  ((data && data.islands) || []).forEach((s) => {
+    const k = seaKm(place, s);
+    if (k <= s.km && k < bd) { best = s; bd = k; }
+  });
+  return best;
+}
+
+function seaIsoOn(iso, day) {
+  const p = (iso.periods || []).find((x) => day >= x.from && day <= x.to);
+  if (!p) return null;
+  const k = Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${p.anchor}T00:00:00Z`)) / 864e5);
+  const ex = (iso.except || {})[day] || {};
+  const n = p.groups.length;
+  return p.ferries.map((f) => ({ ferry: f.name, color: f.color || null, group: ex[f.name] || p.groups[(((k + f.shift) % n) + n) % n] }));
+}
+
+function seaIsoLine(d, now) {
+  if (!d.iso) return null;
+  const tomorrow = now.getHours() >= 12;
+  const list = seaIsoOn(d.iso, ymd(addDays(now, tomorrow ? 1 : 0)));
+  if (!list) return null;
+  const pick = d.iso.pick && d.iso.pick.length ? list.filter((x) => d.iso.pick.includes(x.ferry)) : list;
+  if (!pick.length) return null;
+  const items = pick.map((x) => ({ color: x.color, text: `${seaFerryShort(x.ferry)} ${pick.length === 1 ? x.group : x.group.split("・")[0]}` }));
+  return { when: tomorrow ? "あす" : "", items };
 }
 
 async function loadSea(arg, ctx, item) {
-  const opt = seaOptions(arg);
+  const isoData = await getJSON(`${SEA.page}data/isowari.json`, "sea_isowari.json", 60 * 24, item).catch(() => null);
+  const opt = seaOptions(arg, seaFerryOf(isoData));
   const place = await seaPlace(opt.place);
   const port = seaNearestPort(place);
   const la = place.lat.toFixed(2);
@@ -1116,7 +1156,9 @@ async function loadSea(arg, ctx, item) {
     return h * 60 + m;
   };
   const jma = jmaJson && areaJma ? seaJmaText(jmaJson, areaJma.c10) : {};
+  const island = seaIsland(isoData, place);
   return {
+    iso: island ? { name: island.name, periods: island.periods, except: island.except || {}, pick: opt.ferries } : null,
     name: place.name || (areaJma && areaJma.town) || `${la},${lo}`,
     lat: place.lat,
     lon: place.lon,
@@ -1386,7 +1428,7 @@ defineCard("sea", {
   icon: "🌊",
   label: "海",
   aliases: ["umi", "marine", "海", "波", "釣り"],
-  help: `波・風・潮をグラフで（sea:城ヶ島 / sea:20.4253,136.0814 / 空なら今いる場所 / sea:城ヶ島,wave,wind で出すものを選ぶ（wave 波・tide 潮・wind 風） / deg で風の向きを角度に。アプリの「🌊 海の Parameter を作る」で作れる）。${SEA.names.jma}の波の文と警報・注意報、近い港の${SEA.names.tide}を先に、緯度経度で読む波4つ・風4つの予報をあとに。押すと${SEA.names.page}が開く`,
+  help: `波・風・潮をグラフで（sea:城ヶ島 / sea:20.4253,136.0814 / 空なら今いる場所 / sea:城ヶ島,wave,wind で出すものを選ぶ（wave 波・tide 潮・wind 風） / deg で風の向きを角度に / 磯割のある島（鵜来島）は、下の行に渡船ごとのその日の磯（12時からはあす）。sea:鵜来島,家中 で渡船を選ぶ（いくつでも）。アプリの「🌊 海の Parameter を作る」で作れる）。${SEA.names.jma}の波の文と警報・注意報、近い港の${SEA.names.tide}を先に、緯度経度で読む波4つ・風4つの予報をあとに。押すと${SEA.names.page}が開く`,
   keep: (d) => d,
   load: loadSea,
   refreshAt(d, ctx) {
@@ -1564,6 +1606,21 @@ defineCard("sea", {
     const cur = d.current && d.current.kn[i] != null ? `流れ ${d.current.dir[i] == null ? "" : `${seaDirText(d, d.current.dir[i])}へ`}${d.current.kn[i].toFixed(1)}kn` : "";
     const parts = [next.tide && next.tide.text, next.mazume && (next.mazume.now ? `いま${next.mazume.k}` : next.mazume.text), gust != null ? `突風 ${gust}m/s` : "", cur, (d.sst || [])[i] != null && w >= 280 ? `水温 ${Math.round(d.sst[i])}℃` : ""].filter(Boolean);
     let left = w;
+    const iso = seaIsoLine(d, now);
+    if (iso) {
+      if (iso.when) { txt(foot, iso.when, 9, theme.sub, "semibold", { scale: 0.7 }); left -= textWidth(iso.when, 9) + 8; }
+      iso.items.forEach((x) => {
+        const need = textWidth(x.text, 9) + 18;
+        if (need > left) return;
+        left -= need;
+        const dot = foot.addStack();
+        dot.layoutHorizontally();
+        dot.spacing = 2;
+        dot.centerAlignContent();
+        txt(dot, "●", 7, x.color ? new Color(x.color) : theme.sub);
+        txt(dot, x.text, 9, theme.text, "semibold", { scale: 0.7 });
+      });
+    }
     parts.forEach((p) => {
       if (textWidth(p, 9) + 8 > left) return;
       left -= textWidth(p, 9) + 8;

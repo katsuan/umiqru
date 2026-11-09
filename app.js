@@ -382,6 +382,8 @@ function busy(text, { dim = false, button = "" } = {}) {
   st.classList.toggle("is-busy", text != null);
   if (text != null) st.textContent = text;
   document.body.classList.toggle("is-loading", text != null && dim);
+  // ボタンが見つからないとき（古いページのまま新しい app.js を読んだときなど）も、読みこみは止めない
+  if (!btn) return;
   btn.disabled = text != null && !!button;
   btn.classList.toggle("is-busy", text != null);
   btn.textContent = text != null && button ? button : "見る";
@@ -502,7 +504,9 @@ function drawHowto() {
   const S = NAMES.scriptable, W = NAMES.widgetScript;
   document.getElementById("howto-title").textContent = "iPhone のウィジェットにする";
   document.getElementById("howto-lead").textContent = `${S}（無料のアプリ）に、このページと同じ海の予報を出すスクリプトを入れて、ホーム画面に置きます。`;
-  const param = placeParam();
+  // 磯割のある島で、いつもの渡船を選んでいれば、その渡船も（ウィジェットの下の行に、その渡船の磯）
+  const isl = islandFor(state.place);
+  const param = [placeParam(), ...myFerries(isl).map(f => f.replace(/渡船$/, ""))].join(",");
   document.getElementById("howto-steps").innerHTML = `
     <li>App Store で「${S}」を入れる（無料）。</li>
     <li>下のボタンでスクリプトをコピーする。
@@ -522,6 +526,7 @@ function drawHowto() {
       <tr><td><span class="muted">（空）</span></td><td class="wrap">今いる場所</td></tr>
       <tr><td><code class="param">城ヶ島,wave,wind</code></td><td class="wrap">書いたものだけを書いた順に（wave 波・tide 潮・wind 風）</td></tr>
       <tr><td><code class="param">城ヶ島,wind,deg</code></td><td class="wrap">風のグラフだけ・向きを角度で</td></tr>
+      <tr><td><code class="param">鵜来島,家中</code></td><td class="wrap">磯割のある島は、大・中の下の行に渡船ごとの磯（12時からはあすのぶん）。渡船の名前を書くと、その渡船だけ（いくつでも）</td></tr>
     </tbody>`;
   document.getElementById("howto-note").textContent = `ウィジェットは iOS の都合で15分〜1時間ごとに描き直されます。Parameter の「,」や「:」が消えてしまうときは、${S} の中で「${W}」を一度開いて、出てくるメニューで作った Parameter を貼ってください。`;
   document.getElementById("copy-script").onclick = ev => copyText(loadScript, ev.currentTarget);
@@ -615,6 +620,7 @@ function init() {
       const isl = islandFor(state.place), list = myFerries(isl), name = f.dataset.ferry;
       setMyFerries(isl, list.includes(name) ? list.filter(x => x !== name) : [...list, name]);
       render();
+      drawHowto();
       return;
     }
     const r = ev.target.closest("[data-iso-day]");
@@ -624,7 +630,7 @@ function init() {
       refreshTide();
     }
   });
-  loadIso().then(render);
+  loadIso().then(() => { render(); if (state.place) drawHowto(); });
   document.querySelectorAll(".seg").forEach(seg => seg.addEventListener("click", ev => {
     const b = ev.target.closest("[data-dir]");
     if (!b || b.dataset.dir === state.windDir) return;
