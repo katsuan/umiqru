@@ -8,7 +8,7 @@
 // 新しい版が出ると通知で知らせます。入れかえ方は https://katsuan.github.io/umiqru/#howto
 // ======================================
 
-const SEA_BUILD = "5bfc3c51c7";
+const SEA_BUILD = "134c9708a0";
 
 const PALETTE = {
   brand: "#6C47FF",
@@ -1622,10 +1622,6 @@ defineCard("sea", {
       });
     }
     box.addSpacer();
-    if (isoRow) {
-      seaIsoDraw(hrow(box, 8), iso, w, theme);
-      box.addSpacer(2);
-    }
     const foot = hrow(box, 8);
     const gust = (d.gust || [])[i];
     const cur = d.current && d.current.kn[i] != null ? `流れ ${d.current.dir[i] == null ? "" : `${seaDirText(d, d.current.dir[i])}へ`}${d.current.kn[i].toFixed(1)}kn` : "";
@@ -1637,6 +1633,10 @@ defineCard("sea", {
       left -= textWidth(p, 9) + 8;
       txt(foot, p, 9, theme.sub, "semibold", { scale: 0.7 });
     });
+    if (isoRow) {
+      box.addSpacer(2);
+      seaIsoDraw(hrow(box, 8), iso, w, theme);
+    }
   },
 });
 
