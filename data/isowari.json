@@ -1,5 +1,5 @@
 {
-  "note": "磯割：渡船ごとに、その日に上がる磯のまとまり。渡船の発表（下の sources）を見て入れる。毎日1つずつずれてくり返すので、anchor の日に shift 0 の渡船が groups[0]、shift 1 が groups[1] … として、そこからの日数で計算する。期間（from〜to）の外は「まだ発表されていない」。くり返しから外れる日は except に { \"2026-12-31\": { \"家中渡船\": \"グンカン\" } } のように書く",
+  "note": "sources の watch … 見張り（tools/isowari-watch.mjs）が見る、磯割表の画像のファイル名の決まり（正規表現）。磯割：渡船ごとに、その日に上がる磯のまとまり。渡船の発表（下の sources）を見て入れる。毎日1つずつずれてくり返すので、anchor の日に shift 0 の渡船が groups[0]、shift 1 が groups[1] … として、そこからの日数で計算する。期間（from〜to）の外は「まだ発表されていない」。くり返しから外れる日は except に { \"2026-12-31\": { \"家中渡船\": \"グンカン\" } } のように書く",
   "islands": [
     {
       "id": "uguru",
@@ -24,9 +24,9 @@
       "except": {},
       "names": "表によって書き方がちがう（カメ＝カメバエ、マルサゲ＝丸サゲ、姫島北＝姫島）。3つの表（2026年8月〜2027年6月）で、渡船ごとの順番が同じことを確かめた",
       "sources": [
-        { "name": "沖の島の釣り（鵜来島の磯割表）", "url": "https://okinoshima-fishing.com/ugurushima-isowari/" },
-        { "name": "鵜来島weblog（磯割表）", "url": "https://ug139.blog.jp/archives/37537200.html" },
-        { "name": "Fishing KOCHI（鵜来島 渡船 磯割）", "url": "https://fishingkochi.com/2026%E5%B9%B4%E3%80%80%E9%B5%9C%E6%9D%A5%E5%B3%B6%E3%80%80%E6%B8%A1%E8%88%B9%E3%80%80%E7%A3%AF%E5%89%B2%E3%80%80/" }
+        { "name": "沖の島の釣り（鵜来島の磯割表）", "url": "https://okinoshima-fishing.com/ugurushima-isowari/", "watch": "^isowari-uguru-.*\\.jpe?g$" },
+        { "name": "鵜来島weblog（磯割表）", "url": "https://ug139.blog.jp/archives/37537200.html", "watch": "^[0-9a-f]{8}\\.png$" },
+        { "name": "Fishing KOCHI（鵜来島 渡船 磯割）", "url": "https://fishingkochi.com/2026%E5%B9%B4%E3%80%80%E9%B5%9C%E6%9D%A5%E5%B3%B6%E3%80%80%E6%B8%A1%E8%88%B9%E3%80%80%E7%A3%AF%E5%89%B2%E3%80%80/", "watch": "^鵜来島\\d{4}-\\d+\\.png$" }
       ]
     }
   ]

@@ -1,0 +1,58 @@
+# 磯割表の見張り：週に1回、出どころのページの磯割表の画像（data/isowari.json の sources）を前の回とくらべる。
+# 変わったところか、期間の終わりが近いことがあれば Issue で知らせる（開いている Issue があれば、そこに書き足す）。
+# 前の回の記録は watch-state の枝（isowari.json の1ファイルだけ）。公開（pages.yml）は動かない
+name: 磯割表の見張り
+
+on:
+  schedule:
+    - cron: "17 21 * * 0" # 毎週月曜 6:17（日本時間）
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: isowari-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 前の回の記録を読む
+        run: |
+          if git fetch --depth 1 origin watch-state 2>/dev/null; then
+            git show FETCH_HEAD:isowari.json > "$RUNNER_TEMP/prev.json"
+          else
+            echo '{}' > "$RUNNER_TEMP/prev.json"
+          fi
+
+      - name: ページを見る
+        run: node tools/isowari-watch.mjs "$RUNNER_TEMP/prev.json" "$RUNNER_TEMP/next.json" "$RUNNER_TEMP/report.md"
+
+      - name: 変わったところがあれば Issue で知らせる
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ -s "$RUNNER_TEMP/report.md" ] || exit 0
+          gh label create isowari --color 0E6E9E --description "磯割表の見張り" --force
+          n=$(gh issue list --label isowari --state open --json number -q '.[0].number')
+          if [ -n "$n" ]; then
+            gh issue comment "$n" --body-file "$RUNNER_TEMP/report.md"
+          else
+            gh issue create --title "磯割表を確かめる（$(TZ=Asia/Tokyo date +%F)）" --label isowari --body-file "$RUNNER_TEMP/report.md"
+          fi
+
+      - name: 記録を残す
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -q --orphan watch-state
+          git rm -rfq .
+          cp "$RUNNER_TEMP/next.json" isowari.json
+          git add isowari.json
+          git commit -qm "磯割表の見張り：記録（$(TZ=Asia/Tokyo date +%F)）"
+          git push -qf origin watch-state
