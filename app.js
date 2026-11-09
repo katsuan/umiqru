@@ -371,8 +371,26 @@ function diaryContext(v) {
 
 // ---- 流れ ----
 const statusEl = () => document.getElementById("status");
+// 読みこみ中の知らせ：ボタンを「さがし中…」に、知らせの行に動く線、前の場所の表示はうすく。text が null で終わり
+let doneTimer = 0;
+function busy(text, { dim = false, button = "" } = {}) {
+  const st = statusEl(), btn = document.getElementById("place-go");
+  clearTimeout(doneTimer);
+  st.classList.toggle("is-busy", text != null);
+  if (text != null) st.textContent = text;
+  document.body.classList.toggle("is-loading", text != null && dim);
+  btn.disabled = text != null && !!button;
+  btn.textContent = text != null && button ? button : "見る";
+}
+// 終わりの知らせ（少しして消す）
+function doneNote(text, keep = false) {
+  busy(null);
+  statusEl().textContent = text;
+  if (!keep) doneTimer = setTimeout(() => { statusEl().textContent = ""; }, 2500);
+}
 async function go(place) {
-  statusEl().textContent = "読みこみ中…";
+  const name = place.alts ? baseName(place.name) : place.name;
+  busy(`${name}を読みこみ中…`, { dim: true });
   try {
     const ctxP = placeContext(place);
     const token = state.token = {};
@@ -380,7 +398,7 @@ async function go(place) {
     const data = await loadForecasts(place, ctxP, part => {
       if (token !== state.token || !state.ctx) return;
       state.place = place; state.data = part;
-      statusEl().textContent = "読みこみ中…（届いたものから表示）";
+      busy(`${name}を読みこみ中…（届いたものから表示）`);
       render();
     });
     if (token !== state.token) return;
@@ -394,9 +412,9 @@ async function go(place) {
     // MSM は日本のまわりだけなので、日本の外では読めなくてよい
     const names = { wx: "天気", wind: "風", msm: state.ctx.jma ? "風（MSM）" : null, waves: "波", sea: "水温・海流・海面", jma: `${NAMES.jma}の予報`, amedas: NAMES.amedas, warn: `${NAMES.jma}の警報` };
     const errs = data.errors.map(k => names[k]).filter(Boolean);
-    statusEl().textContent = errs.length ? `読めなかったもの：${errs.join("・")}` : "";
+    doneNote(errs.length ? `読めなかったもの：${errs.join("・")}` : `${name}を表示しました`, errs.length > 0);
   } catch (e) {
-    statusEl().textContent = "読みこめませんでした。通信を確かめてください。";
+    doneNote("読みこめませんでした。通信を確かめてください。", true);
   }
 }
 async function refreshTide() {
@@ -551,17 +569,17 @@ function init() {
   const input = document.getElementById("place-input");
   document.getElementById("place-form").addEventListener("submit", async ev => {
     ev.preventDefault();
-    if (!input.value.trim()) return;
-    statusEl().textContent = "さがしています…";
+    if (!input.value.trim()) { doneNote("場所を入れてください（港・地名・緯度経度）"); input.focus(); return; }
+    busy(`「${input.value.trim()}」をさがしています…`, { button: "さがし中…" });
     try { const p = await findPlace(input.value); input.value = ""; input.blur(); go(p); }
-    catch (e) { statusEl().textContent = e.message; }
+    catch (e) { doneNote(e.message, true); }
   });
   document.getElementById("here").addEventListener("click", () => {
     if (!navigator.geolocation) { statusEl().textContent = "この端末では今いる場所を使えません"; return; }
-    statusEl().textContent = "今いる場所をたしかめています…";
+    busy("今いる場所をたしかめています…", { button: "さがし中…" });
     navigator.geolocation.getCurrentPosition(
       pos => go({ name: "今いる場所", lat: +pos.coords.latitude.toFixed(3), lon: +pos.coords.longitude.toFixed(3) }),
-      () => { statusEl().textContent = "今いる場所を使えませんでした"; },
+      () => { doneNote("今いる場所を使えませんでした", true); },
       { maximumAge: 10 * 60 * 1000, timeout: 15000 });
   });
   const days = document.getElementById("days");
@@ -653,8 +671,8 @@ function init() {
   // 最近見た場所と同じリンクなら、覚えている場所（同じ名前のほかの候補つき）で開く
   const known = q && (store.get("umiqru:recent") || []).find(p => placeParam(p) === q);
   if (known) go(known);
-  else if (q) findPlace(q).then(go).catch(e => { statusEl().textContent = e.message; });
+  else if (q) findPlace(q).then(go).catch(e => { doneNote(e.message, true); });
   else if (last) go(last);
-  else findPlace(DEFAULT_PLACE).then(go).catch(e => { statusEl().textContent = e.message; });
+  else findPlace(DEFAULT_PLACE).then(go).catch(e => { doneNote(e.message, true); });
 }
 init();
