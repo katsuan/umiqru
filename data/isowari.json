@@ -22,8 +22,10 @@
         }
       ],
       "except": {},
+      "names": "表によって書き方がちがう（カメ＝カメバエ、マルサゲ＝丸サゲ、姫島北＝姫島）。3つの表（2026年8月〜2027年6月）で、渡船ごとの順番が同じことを確かめた",
       "sources": [
         { "name": "沖の島の釣り（鵜来島の磯割表）", "url": "https://okinoshima-fishing.com/ugurushima-isowari/" },
+        { "name": "鵜来島weblog（磯割表）", "url": "https://ug139.blog.jp/archives/37537200.html" },
         { "name": "Fishing KOCHI（鵜来島 渡船 磯割）", "url": "https://fishingkochi.com/2026%E5%B9%B4%E3%80%80%E9%B5%9C%E6%9D%A5%E5%B3%B6%E3%80%80%E6%B8%A1%E8%88%B9%E3%80%80%E7%A3%AF%E5%89%B2%E3%80%80/" }
       ]
     }
