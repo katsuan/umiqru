@@ -13,6 +13,7 @@ import { dashSwatch, drawChart, legend, timeline, tlScroll } from "./js/chart.js
 import { diaryNow, drawDiary, drawDiaryShell, initDiary } from "./js/diary.js";
 import { canCard, oqrnCardUrl, pageUrl } from "./js/card.js";
 import { mazume } from "./js/daydata.js";
+import { initMapPick, openMapPick } from "./js/mappick.js";
 import { ferriesOf, ferryStyle, isoOn, isoUntil, islandFor, loadIso, myFerries, setMyFerries } from "./js/iso.js";
 
 // ---- 線 ----
@@ -598,6 +599,12 @@ function init() {
     try { const p = await findPlace(input.value); input.value = ""; input.blur(); go(p, { ask: true }); }
     catch (e) { doneNote(e.message, true); }
   });
+  // 地図で選ぶ：押した所の「緯度,経度」（名前をつけたら「緯度,経度=名前」）を、検索と同じ道で見る
+  initMapPick(copyText);
+  document.getElementById("map-open").addEventListener("click", () => openMapPick(state.place, q => {
+    input.value = q;
+    document.getElementById("place-form").requestSubmit();
+  }));
   document.getElementById("here").addEventListener("click", () => {
     if (!navigator.geolocation) { statusEl().textContent = "この端末では今いる場所を使えません"; return; }
     busy("今いる場所をたしかめています…", { button: "さがし中…" });
@@ -653,7 +660,7 @@ function init() {
       ${WAVE_MODELS.map(k => modelRow(k, "波")).join("")}
       ${WIND_MODELS.map(k => modelRow(k, "風")).join("")}
       <li><b><a href="https://open-meteo.com/" rel="noopener">${NAMES.openMeteo}</a></b>上の波・風の予報（気象庁の MSM・GSM も）と、突風（GFS・IFS）・天気・水温・沖の海流・海面の高さ・地名さがしを、緯度経度で読む（CC BY 4.0）</li>
-      <li><b>${NAMES.gsi}</b>場所から市区町村（気象庁の地域を決める）</li>
+      <li><b>${NAMES.gsi}</b>場所から市区町村（気象庁の地域を決める）。「地図で選ぶ」の地図と写真（地理院タイル。地図を動かすのは <a href="https://leafletjs.com/" rel="noopener">${NAMES.leaflet}</a>）</li>
     </ul>
     <p>予報は計算のめやすです。航海には使えません。海に出るかどうかは、${NAMES.jma}の警報・注意報と現地のようすで決めてください。</p>`;
   // 波・風のグラフの下の「それぞれの予報」

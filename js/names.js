@@ -10,6 +10,7 @@ export const NAMES = {
   openMeteo: "Open-Meteo",
   tide736: "tide736.net",
   gsi: "国土地理院",
+  leaflet: "Leaflet",
   scriptable: "Scriptable",
   widgetScript: "うみくる",
 };

@@ -54,7 +54,7 @@
 
   /* 場所と日 */
   .controls { display: grid; gap: 8px; margin-bottom: 16px; }
-  .place { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; }
+  .place { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 8px; }
   input[type="search"] {
     appearance: none; -webkit-appearance: none;
     width: 100%; min-width: 0; font: inherit; font-size: 16px; color: var(--text);
@@ -386,3 +386,14 @@ table.iso-days tbody tr.on .is-ferry { background: color-mix(in srgb, var(--ferr
 .iso-pill-ferry { color: var(--text-2); }
 .iso-pill strong { font-weight: 700; color: var(--text); }
 .iso-pill[aria-pressed="true"] { background: color-mix(in srgb, var(--ferry) 30%, var(--surface)); }
+
+/* 地図で選ぶ（js/mappick.js）。地図のしるしは Q キットにないので、ここで（Lucide の map） */
+.ls-icon[data-icon="map"] { --ls-i: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z%22/%3E%3Cpath d=%22M15 5.764v15%22/%3E%3Cpath d=%22M9 3.236v15%22/%3E%3C/svg%3E"); }
+dialog#map-pick { width: min(720px, calc(100vw - 32px)); }
+.map-in { gap: 8px; }
+.map-box { height: min(56dvh, 480px); min-height: 240px; border-radius: 8px; border: 1px solid var(--line); background: var(--band); }
+.map-in p { margin: 0; }
+.map-ll strong { font-variant-numeric: tabular-nums; }
+.map-name { display: grid; gap: 4px; }
+.map-name input { appearance: none; -webkit-appearance: none; width: 100%; min-width: 0; font: inherit; font-size: 16px; color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 16px; height: 40px; box-sizing: border-box; }
+.map-box .leaflet-control-attribution { font-size: 11px; }

@@ -39,13 +39,15 @@
       <label class="vh" for="place-input">場所</label>
       <input type="search" id="place-input" placeholder="港・地名・緯度経度" enterkeyhint="search" aria-describedby="place-hint">
       <button type="submit" class="primary" id="place-go">見る</button>
+      <button type="button" id="map-open" aria-label="地図で選ぶ"><span class="ls-icon" data-icon="map" aria-hidden="true"></span></button>
       <button type="button" id="here" aria-label="今いる場所"><span class="ls-icon" data-icon="place" aria-hidden="true"></span></button>
     </div>
-    <p class="place-hint" id="place-hint">例：城ヶ島、鴨川、35.13, 139.62（地図の緯度, 経度）</p>
+    <p class="place-hint" id="place-hint">例：城ヶ島、鴨川、35.13, 139.62（緯度, 経度）。地図からも選べます</p>
     <div class="chips" id="recent"></div>
     <div class="chips" id="days" role="group" aria-label="日にち"></div>
   </form>
 
+  <dialog id="map-pick" class="viewer" aria-label="地図で選ぶ"></dialog>
   <p class="status" id="status" aria-live="polite"></p>
   <!-- いま見ている場所・日時と、選んだ港・気象庁の地域（どのタブでも見える） -->
   <div class="place-info" id="place-info"></div>
