@@ -8,7 +8,7 @@
 // 新しい版が出ると通知で知らせます。入れかえ方は https://katsuan.github.io/umiqru/#howto
 // ======================================
 
-const SEA_BUILD = "134c9708a0";
+const SEA_BUILD = "f2cf0b0868";
 
 const PALETTE = {
   brand: "#6C47FF",
@@ -1111,6 +1111,7 @@ function seaIsoLine(d, now) {
 function seaIsoDraw(row, iso, width, theme) {
   const need = (list) => list.reduce((a, x) => a + textWidth(x.text, 9) + 18, iso.when ? textWidth(iso.when, 9) + 8 : 0);
   const items = need(iso.full) <= width ? iso.full : iso.short;
+  if (need(items.slice(0, 1)) > width) return 0;
   let used = 0;
   if (iso.when) { txt(row, iso.when, 9, theme.sub, "semibold", { scale: 0.7 }); used += textWidth(iso.when, 9) + 8; }
   items.forEach((x) => {
@@ -1627,12 +1628,12 @@ defineCard("sea", {
     const cur = d.current && d.current.kn[i] != null ? `流れ ${d.current.dir[i] == null ? "" : `${seaDirText(d, d.current.dir[i])}へ`}${d.current.kn[i].toFixed(1)}kn` : "";
     const parts = [next.tide && next.tide.text, next.mazume && (next.mazume.now ? `いま${next.mazume.k}` : next.mazume.text), gust != null ? `突風 ${gust}m/s` : "", cur, (d.sst || [])[i] != null && w >= 280 ? `水温 ${Math.round(d.sst[i])}℃` : ""].filter(Boolean);
     let left = w;
-    if (iso && !isoRow) left -= seaIsoDraw(foot, iso, left, theme);
     parts.forEach((p) => {
       if (textWidth(p, 9) + 8 > left) return;
       left -= textWidth(p, 9) + 8;
       txt(foot, p, 9, theme.sub, "semibold", { scale: 0.7 });
     });
+    if (iso && !isoRow && left > 0) seaIsoDraw(foot, iso, left, theme);
     if (isoRow) {
       box.addSpacer(2);
       seaIsoDraw(hrow(box, 8), iso, w, theme);
