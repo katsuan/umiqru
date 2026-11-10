@@ -318,6 +318,8 @@ select.ls-input { appearance: none; -webkit-appearance: none; color: var(--text)
 .tl-step:first-child::before { top: 16px; }
 .tl-step:last-child::before { bottom: calc(100% - 16px); }
 .tl-dot { position: relative; z-index: 1; width: 32px; height: 32px; margin-top: 4px; border-radius: 50%; background: var(--surface); border: 2px solid var(--line); display: grid; place-items: center; color: var(--text-2); }
+/* 丸やボタンの中に1つだけ置くしるしは、字の横のすきま（is-text）をなくして、まん中に */
+:is(.tl-dot, .ls-icon-button) > .ls-icon { margin: 0; }
 .tl-step.is-start .tl-dot, .tl-step.is-end .tl-dot { width: 16px; height: 16px; margin: 12px 8px 0; }
 .tl-step.is-item .tl-dot { border-color: var(--text-2); }
 .tl-body { display: grid; gap: 4px; justify-items: start; text-align: left; font: inherit; color: var(--text); background: none; border: none; padding: 8px 0; cursor: pointer; }
