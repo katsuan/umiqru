@@ -8,7 +8,7 @@
 // 新しい版が出ると通知で知らせます。入れかえ方は https://katsuan.github.io/umiqru/#howto
 // ======================================
 
-const SEA_BUILD = "1c0024e03b";
+const SEA_BUILD = "99e3117a2c";
 
 const PALETTE = {
   brand: "#6C47FF",
@@ -397,7 +397,7 @@ const SF_FOR_EMOJI = {
 const LINE_ICONS = {
   "☀️": "sun.max", "🌤️": "cloud.sun", "⛅": "cloud.sun", "☁️": "cloud",
   "🌦️": "cloud.sun.rain", "🌧️": "cloud.rain", "⛈️": "cloud.bolt.rain", "🌨️": "cloud.snow", "❄️": "snowflake", "🌫️": "cloud.fog", "🌙": "moon.stars", "🌡️": "thermometer.medium",
-  "☔": "umbrella", "🔐": "lock", "✏️": "pencil", "⚠️": "exclamationmark.triangle", "🌊": "water.waves", "💨": "wind",
+  "☔": "drop", "🔐": "lock", "✏️": "pencil", "⚠️": "exclamationmark.triangle", "🌊": "water.waves", "💨": "wind",
   };
 
 let symbolStyle = "line";
