@@ -8,7 +8,7 @@
 // 新しい版が出ると通知で知らせます。入れかえ方は https://katsuan.github.io/umiqru/#howto
 // ======================================
 
-const SEA_BUILD = "e711e5e7c0";
+const SEA_BUILD = "1c0024e03b";
 
 const PALETTE = {
   brand: "#6C47FF",
@@ -1563,12 +1563,18 @@ defineCard("sea", {
     const big = isBig(ctx);
     const wide = w >= 250;
     const main = hrow(box, 6);
-    const bigSize = big && wide ? 26 : wide ? 20 : w < 110 ? 11 : w < 150 ? 13 : 16;
+    const fullSize = big && wide ? 26 : wide ? 20 : w < 110 ? 11 : w < 150 ? 13 : 16;
     const subSize = big ? 13 : 11;
     const jmaText = j && j.nums.length && big && wide ? `${SEA.names.jma} ${Math.max(...j.nums)}m` : "";
-    const rowW = (jt, wt) => 24 + textWidth(wt, bigSize) * 1.1 + 30 + (jt ? textWidth(jt, 10) * 1.1 + 6 : 0) + 8 + subSize + 6 + textWidth(`${waveText}m`, subSize) * 1.1;
-    const windMain = !wide ? (w < 160 ? windShort : windText) : rowW("", windText) <= w ? windText : windShort;
-    const showJma = jmaText && rowW(jmaText, windMain) <= w;
+    const rowW = (jt, wt, size) => 24 + textWidth(wt, size) * 1.1 + 30 +
+      (wide ? (jt ? textWidth(jt, 10) * 1.1 + 6 : 0) + 8 + subSize + 6 + textWidth(`${waveText}m`, subSize) * 1.1 : 0);
+    const sizes = [1, 0.85, 0.75, 0.7].map((f) => Math.round(fullSize * f));
+    const texts = !wide && w < 160 ? [windShort] : [windText, windShort];
+    const tries = texts.flatMap((t) => sizes.map((size) => ({ t, size })));
+    const fit = tries.find((x) => rowW("", x.t, x.size) <= w) || tries[tries.length - 1];
+    const windMain = fit.t;
+    const bigSize = fit.size;
+    const showJma = jmaText && rowW(jmaText, windMain, bigSize) <= w;
     txt(main, "💨", big ? 15 : 12, theme.text);
     txt(main, windMain, bigSize, theme.text, "round", { scale: 0.5 });
     txt(main, "m/s", 11, theme.sub, "medium");
