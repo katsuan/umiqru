@@ -8,7 +8,7 @@
 // 新しい版が出ると通知で知らせます。入れかえ方は https://katsuan.github.io/umiqru/#howto
 // ======================================
 
-const SEA_BUILD = "07f7e1c096";
+const SEA_BUILD = "e711e5e7c0";
 
 const PALETTE = {
   brand: "#6C47FF",
@@ -1563,22 +1563,22 @@ defineCard("sea", {
     const big = isBig(ctx);
     const wide = w >= 250;
     const main = hrow(box, 6);
-    const waveSize = big && wide ? 26 : wide ? 20 : w < 110 ? 11 : w < 150 ? 13 : 16;
-    const windSize = big ? 13 : 11;
+    const bigSize = big && wide ? 26 : wide ? 20 : w < 110 ? 11 : w < 150 ? 13 : 16;
+    const subSize = big ? 13 : 11;
     const jmaText = j && j.nums.length && big && wide ? `${SEA.names.jma} ${Math.max(...j.nums)}m` : "";
-    const rowW = (jt, wt) => 24 + textWidth(waveText, waveSize) * 1.1 + 18 + (jt ? textWidth(jt, 10) * 1.1 + 6 : 0) + 8 + windSize + 6 + textWidth(`${wt}m/s`, windSize) * 1.1;
-    const showJma = jmaText && rowW(jmaText, windText) <= w;
-    const windMain = rowW(showJma ? jmaText : "", windText) <= w ? windText : windShort;
-    txt(main, "🌊", big ? 15 : 12, theme.text);
-    txt(main, waveText, waveSize, theme.text, "round", { scale: 0.5 });
-    txt(main, "m", 11, theme.sub, "medium");
-    if (showJma) txt(main, jmaText, 10, theme.sub, "semibold", { scale: 0.7 });
+    const rowW = (jt, wt) => 24 + textWidth(wt, bigSize) * 1.1 + 30 + (jt ? textWidth(jt, 10) * 1.1 + 6 : 0) + 8 + subSize + 6 + textWidth(`${waveText}m`, subSize) * 1.1;
+    const windMain = !wide ? (w < 160 ? windShort : windText) : rowW("", windText) <= w ? windText : windShort;
+    const showJma = jmaText && rowW(jmaText, windMain) <= w;
+    txt(main, "💨", big ? 15 : 12, theme.text);
+    txt(main, windMain, bigSize, theme.text, "round", { scale: 0.5 });
+    txt(main, "m/s", 11, theme.sub, "medium");
     main.addSpacer();
     if (wide) {
-      txt(main, "💨", windSize, theme.text);
-      txt(main, `${windMain}m/s`, windSize, theme.text, "semibold", { scale: 0.6 });
+      if (showJma) txt(main, jmaText, 10, theme.sub, "semibold", { scale: 0.7 });
+      txt(main, "🌊", subSize, theme.text);
+      txt(main, `${waveText}m`, subSize, theme.text, "semibold", { scale: 0.6 });
     } else {
-      txt(box, `💨 ${w < 160 ? windShort : windText}m/s`, 10, theme.sub, "semibold", { scale: 0.6 });
+      txt(box, `🌊 ${waveText}m`, 10, theme.sub, "semibold", { scale: 0.6 });
     }
     const wxLine = big && wide && j && j.weather;
     if (wxLine) txt(box, `${SEA.names.jma} ${j.weather}`, 10, theme.sub, "semibold", { scale: 0.6 });
