@@ -8,7 +8,7 @@
 // 新しい版が出ると通知で知らせます。入れかえ方は https://katsuan.github.io/umiqru/#howto
 // ======================================
 
-const SEA_BUILD = "99e3117a2c";
+const SEA_BUILD = "4128724f68";
 
 const PALETTE = {
   brand: "#6C47FF",
@@ -1568,12 +1568,10 @@ defineCard("sea", {
     const jmaText = j && j.nums.length && big && wide ? `${SEA.names.jma} ${Math.max(...j.nums)}m` : "";
     const rowW = (jt, wt, size) => 24 + textWidth(wt, size) * 1.1 + 30 +
       (wide ? (jt ? textWidth(jt, 10) * 1.1 + 6 : 0) + 8 + subSize + 6 + textWidth(`${waveText}m`, subSize) * 1.1 : 0);
-    const sizes = [1, 0.85, 0.75, 0.7].map((f) => Math.round(fullSize * f));
+    const sizes = [...new Set([1, 0.85, 0.75, 0.7].map((f) => Math.round(fullSize * f)))];
     const texts = !wide && w < 160 ? [windShort] : [windText, windShort];
     const tries = texts.flatMap((t) => sizes.map((size) => ({ t, size })));
-    const fit = tries.find((x) => rowW("", x.t, x.size) <= w) || tries[tries.length - 1];
-    const windMain = fit.t;
-    const bigSize = fit.size;
+    const { t: windMain, size: bigSize } = tries.find((x) => rowW("", x.t, x.size) <= w) || tries[tries.length - 1];
     const showJma = jmaText && rowW(jmaText, windMain, bigSize) <= w;
     txt(main, "💨", big ? 15 : 12, theme.text);
     txt(main, windMain, bigSize, theme.text, "round", { scale: 0.5 });
