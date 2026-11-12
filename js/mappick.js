@@ -1,4 +1,4 @@
-// うみくる：地図から場所を選ぶ窓（押した所・動かしたピンの緯度経度で見る。名前もつけられる。寄ると潮汐表のある港の丸）
+// うみくる：地図から場所を選ぶ窓（押した所・動かしたピンの緯度経度で見る。名前もつけられる。寄ると潮の地点の丸：潮汐表の港・気象庁の潮位表）
 // 地図は国土地理院のタイル（標準・写真）を Leaflet で。Leaflet は窓を初めて開いたときだけ読む
 // 読まれるところ：app.js（検索欄の横の地図のボタン）
 import { NAMES } from "./names.js";
@@ -50,16 +50,36 @@ function setLayer(key) {
   document.querySelectorAll("#map-layer [data-layer]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.layer === key)));
 }
 
-// 潮汐表のある港のピン（data/ports.json）。押すと、その港の位置と名前を選ぶ。寄ったときだけ出す
+// 潮の地点の丸：潮汐表（tide736）の港（data/ports.json）と、気象庁の潮位表の地点（data/jma-stations.json。くらぶボットの釣りが使う）。
+// 1.5km 以内の両方は1つにまとめ、どちらの地点かは色と字でわかるように（青のふち：潮汐表・紫のふち：気象庁・青のふちで中が紫：両方）。
+// 押すと、その地点の位置と名前（潮汐表の港があればその名前）を選ぶ。寄ったときだけ出す
+const MARK = { tide: "#0e6e9e", jma: "#6250d6", sameKm: 1.5 };
+const km = (a, b) => {
+  const r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLon = (b.lon - a.lon) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLon / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(h));
+};
+const loadJma = () => fetch("data/jma-stations.json").then(r => (r.ok ? r.json() : { stations: [] }))
+  .then(j => (j.stations || []).map(([code, name, lat, lon]) => ({ code, name, lat, lon }))).catch(() => []);
 function addPorts(L) {
-  loadPorts().then(list => {
+  Promise.all([loadPorts().catch(() => []), loadJma()]).then(([tides, jmas]) => {
+    const used = new Set();
+    const spots = tides.map(p => {
+      const j = jmas.find((s, i) => !used.has(i) && km(p, s) <= MARK.sameKm);
+      if (j) used.add(jmas.indexOf(j));
+      return { lat: p.lat, lon: p.lon, name: p.name, tide: p.name, jma: j?.name || "" };
+    }).concat(jmas.filter((_, i) => !used.has(i)).map(s => ({ lat: s.lat, lon: s.lon, name: s.name, tide: "", jma: s.name })));
     const canvas = L.canvas({ padding: 0.3, tolerance: 10 }); // 指でも押せるように、まわり10pxまで
-    ports = L.layerGroup(list.map(p => L.circleMarker([p.lat, p.lon], { renderer: canvas, radius: 8, weight: 3, color: "#0e6e9e", fillColor: "#ffffff", fillOpacity: 1 })
-      .bindTooltip(p.name, { direction: "top", offset: [0, -6] })
+    const label = s => [s.tide && `${NAMES.tideTable}：${s.tide}`, s.jma && `${NAMES.jma}：${s.jma}`].filter(Boolean).join("／");
+    ports = L.layerGroup(spots.map(s => L.circleMarker([s.lat, s.lon], {
+      renderer: canvas, radius: 8, weight: 3, color: s.tide ? MARK.tide : MARK.jma, fillColor: s.tide && s.jma ? MARK.jma : "#ffffff", fillOpacity: 1,
+    })
+      .bindTooltip(label(s), { direction: "top", offset: [0, -6] })
       .on("click", ev => {
         L.DomEvent.stopPropagation(ev);
         place(L, ev.latlng);
-        $("map-name").value = p.name;
+        $("map-name").value = s.name;
+        $("map-note").textContent = label(s);
       })));
     const toggle = () => { if (map.getZoom() >= PORT_ZOOM) ports.addTo(map); else ports.remove(); };
     map.on("zoomend", toggle);
@@ -77,7 +97,7 @@ export async function openMapPick(from, pick) {
   let L;
   try { L = await loadLeaflet(); }
   catch (e) { $("map-note").textContent = e.message; return; }
-  $("map-note").textContent = "地図を押すか、ピンを動かして場所を決めます。寄ると、潮汐表のある港が丸で出ます（押すとその港）。写真にすると磯や岩も見えます。";
+  $("map-note").textContent = "地図を押すか、ピンを動かして場所を決めます。寄ると、潮の地点が丸で出ます（押すとその地点）。写真にすると磯や岩も見えます。";
   if (!map) {
     map = L.map("map-box", { zoomControl: true, attributionControl: true });
     map.attributionControl.setPrefix(false);
@@ -107,6 +127,7 @@ export function initMapPick(copy) {
       ${Object.entries(TILES).map(([k, t]) => `<button type="button" class="ls-chip" data-layer="${k}" aria-pressed="${k === "std"}">${t.label}</button>`).join("")}
     </div>
     <div id="map-box" class="map-box"></div>
+    <p class="map-legend small"><span class="dot is-tide"></span>${NAMES.tideTable}（${NAMES.tide736}）の港　<span class="dot is-jma"></span>${NAMES.jma}の潮位表　<span class="dot is-both"></span>両方</p>
     <p class="muted small" id="map-note"></p>
     <p class="map-ll"><span class="sub small">緯度, 経度</span> <strong id="map-ll">—</strong></p>
     <label class="map-name"><span class="sub small">名前（なくてもよい。磯の名前など）</span>
