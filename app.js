@@ -11,6 +11,7 @@ import { jmaWarnings } from "./js/jma.js";
 import { arrow, baseName, dirName, esc, fmt, icon, meanDir, rainCell, rainMmCell, range, spread, tempCell, tideEvents, tideRange, valueAt, wxName, wxShort } from "./js/format.js";
 import { dashSwatch, drawChart, legend, timeline, tlScroll } from "./js/chart.js";
 import { diaryNow, diaryPrefill, drawDiary, drawDiaryShell, initDiary, prefillFromUrl, rememberBot } from "./js/diary.js";
+import { openTideSend, tideFromUrl } from "./js/tidesend.js";
 import { canCard, oqrnCardUrl, pageUrl } from "./js/card.js";
 import { mazume } from "./js/daydata.js";
 import { initMapPick, openMapPick } from "./js/mappick.js";
@@ -717,8 +718,10 @@ function init() {
   // （go がアドレス欄を ?q= だけにするので、先に読んでおく）
   const pre = prefillFromUrl(location.search);
   rememberBot(location.search); // ボットのカードからのリンクなら、そのボットを覚える（日記の「ボットに送る」）
+  const tideDay = tideFromUrl(location.search); // ボットのカードの「🌊 潮をうみくるで直す」から：その日の潮を送る窓
   const opened = (p) => go(p, p === known ? {} : { ask: true }).then(() => {
-    if (pre) { showTab("diary", true); diaryPrefill(pre); }
+    if (tideDay) openTideSend(tideDay);
+    else if (pre) { showTab("diary", true); diaryPrefill(pre); }
   });
   const last = (store.get("umiqru:recent") || [])[0];
   // 最近見た場所と同じリンクなら、覚えている場所（同じ名前のほかの候補つき）で開く
