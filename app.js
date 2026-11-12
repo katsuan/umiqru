@@ -10,7 +10,7 @@ import { loadForecasts, loadTide, tideFor, tideWaiting } from "./js/forecast.js"
 import { jmaWarnings } from "./js/jma.js";
 import { arrow, baseName, dirName, esc, fmt, icon, meanDir, rainCell, rainMmCell, range, spread, tempCell, tideEvents, tideRange, valueAt, wxName, wxShort } from "./js/format.js";
 import { dashSwatch, drawChart, legend, timeline, tlScroll } from "./js/chart.js";
-import { diaryNow, diaryPrefill, drawDiary, drawDiaryShell, initDiary, prefillFromUrl } from "./js/diary.js";
+import { diaryNow, diaryPrefill, drawDiary, drawDiaryShell, initDiary, prefillFromUrl, rememberBot } from "./js/diary.js";
 import { canCard, oqrnCardUrl, pageUrl } from "./js/card.js";
 import { mazume } from "./js/daydata.js";
 import { initMapPick, openMapPick } from "./js/mappick.js";
@@ -716,6 +716,7 @@ function init() {
   // ボットの釣りの記録からのリンク（&d=日にち&c=釣果）：場所を開いたら、日記のタブで、その日の釣果を入れた「日記を書く」を開く
   // （go がアドレス欄を ?q= だけにするので、先に読んでおく）
   const pre = prefillFromUrl(location.search);
+  rememberBot(location.search); // ボットのカードからのリンクなら、そのボットを覚える（日記の「ボットに送る」）
   const opened = (p) => go(p, p === known ? {} : { ask: true }).then(() => {
     if (pre) { showTab("diary", true); diaryPrefill(pre); }
   });

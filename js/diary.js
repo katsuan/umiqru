@@ -102,6 +102,44 @@ export function diaryPrefill(pre) {
   return true;
 }
 
+// ボット（くらぶボット）の LINE の ID（@…）。ボットのカードのリンクの &bot= で覚える。日記の「ボットに送る」に使う
+const BOT_KEY = "umiqru:bot";
+const BOT_ID = /^@[0-9a-z._-]{2,40}$/i;
+/** リンクの &bot=@… を覚える（ちがう形なら何もしない） */
+export function rememberBot(search) {
+  const id = new URLSearchParams(search).get("bot") || "";
+  if (BOT_ID.test(id)) store.set(BOT_KEY, id);
+}
+const botId = () => { const id = store.get(BOT_KEY); return typeof id === "string" && BOT_ID.test(id) ? id : ""; };
+
+/**
+ * ボットに送る文（ボットが読む形。人が読んでもわかるように）：
+ *   📔 うみくるの日記 2026-11-12 ／ 📍 緯度,経度 場所 ／ 潮：港（tide736.net）／ 06:42 アジ 2匹 20cm｜潮 上げ2分 32cm（60%）
+ * 釣果（魚の名前のあるもの）だけ。潮はうみくるの港（tide736）のその時刻の値
+ */
+function botText(e) {
+  const list = [...itemsOf(e)].filter(it => it.fish).sort((a, b) => a.at - b.at).slice(0, 20);
+  const port = list.map(it => condAt(e, it.at)?.tide?.port).find(Boolean);
+  const clean = v => String(v ?? "").replace(/[\r\n｜]/g, " ").trim();
+  return [
+    `📔 ${NAMES.app}の日記 ${e.ymd}`,
+    `📍 ${Number(e.place.lat).toFixed(4)},${Number(e.place.lon).toFixed(4)} ${clean(e.placeTitle || e.place.name || "")}`.trim(),
+    port ? `潮：${port.name || port}（${NAMES.tide736}）` : "",
+    ...list.map(it => {
+      const t = condAt(e, it.at)?.tide;
+      const fish = [clean(it.fish), it.count ? `${clean(it.count)}匹` : "", it.size ? `${clean(it.size)}cm` : ""].filter(Boolean).join(" ");
+      const tide = t && t.cm != null ? `｜潮 ${t.stageText || "—"} ${Math.round(t.cm)}cm${t.pct != null ? `（${t.pct}%）` : ""}` : "";
+      return `${toHM(it.at)} ${fish}${tide}`;
+    }),
+  ].filter(Boolean).join("\n");
+}
+/** その日記を、ボットとのトークの入力欄に入れて開く URL（ボットを知らない・釣果がなければ ""） */
+function botUrl(e) {
+  const id = botId();
+  if (!id || !e.place || !itemsOf(e).some(it => it.fish)) return "";
+  return `https://line.me/R/oaMessage/${encodeURIComponent(id)}/?${encodeURIComponent(botText(e))}`;
+}
+
 /** リンクの ?d=2026-11-12&c=0642~アジ_0810~ を読む（なければ null）。魚の名前は30字まで */
 export function prefillFromUrl(search) {
   const q = new URLSearchParams(search);
@@ -230,6 +268,7 @@ function entryHtml(e) {
     <div class="share-row entry-send">
       ${canCard() ? `<a class="ls-button line is-oqrn" href="${esc(cardUrl(e))}">カードでおくるん</a>` : ""}
       <button type="button" class="ls-button" data-share="${esc(e.id)}">${icon(navigator.share ? "share" : "copy")}${navigator.share ? "共有" : "文をコピー"}</button>
+      ${botUrl(e) ? `<a class="ls-button line" href="${esc(botUrl(e))}">${NAMES.bot}に送る</a>` : ""}
     </div>
     <div class="entry-actions">
       <button type="button" class="ls-button" data-edit="${esc(e.id)}">${icon("edit")}なおす</button>
