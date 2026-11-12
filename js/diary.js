@@ -268,8 +268,8 @@ function entryHtml(e) {
     <div class="share-row entry-send">
       ${canCard() ? `<a class="ls-button line is-oqrn" href="${esc(cardUrl(e))}">カードでおくるん</a>` : ""}
       <button type="button" class="ls-button" data-share="${esc(e.id)}">${icon(navigator.share ? "share" : "copy")}${navigator.share ? "共有" : "文をコピー"}</button>
-      ${botUrl(e) ? `<a class="ls-button line" href="${esc(botUrl(e))}">${NAMES.bot}に送る</a>` : ""}
     </div>
+    ${botUrl(e) ? `<a class="ls-button line is-block entry-bot" href="${esc(botUrl(e))}">${NAMES.bot}に送る</a>` : ""}
     <div class="entry-actions">
       <button type="button" class="ls-button" data-edit="${esc(e.id)}">${icon("edit")}なおす</button>
       <button type="button" class="ls-button" data-delete="${esc(e.id)}">${icon("delete")}消す</button>

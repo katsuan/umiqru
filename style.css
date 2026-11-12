@@ -360,6 +360,7 @@ details.diary-keep summary { cursor: pointer; color: var(--text-3); }
 .diary-keep-row label.ls-button { cursor: pointer; }
 details.diary-keep p { margin: 8px 0 0; }
 .entry-send { margin-top: 8px; }
+.entry-bot { margin-top: 8px; } /* 「くらぶボットに送る」は別の行に（3つ並べるとスマホの幅に入らない） */
 
 /* 磯割（まとめの下。data/isowari.json の島だけ） */
 .iso { display: grid; gap: 8px; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--grid); min-width: 0; }
