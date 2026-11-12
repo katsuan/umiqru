@@ -13,4 +13,5 @@ export const NAMES = {
   leaflet: "Leaflet",
   scriptable: "Scriptable",
   widgetScript: "うみくる",
+  bot: "くらぶボット", // 日記に釣果を入れるリンクを出す LINE のボット（q-qlove-bot の BOT_NAME_ と同じ）
 };

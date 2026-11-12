@@ -10,7 +10,7 @@ import { loadForecasts, loadTide, tideFor, tideWaiting } from "./js/forecast.js"
 import { jmaWarnings } from "./js/jma.js";
 import { arrow, baseName, dirName, esc, fmt, icon, meanDir, rainCell, rainMmCell, range, spread, tempCell, tideEvents, tideRange, valueAt, wxName, wxShort } from "./js/format.js";
 import { dashSwatch, drawChart, legend, timeline, tlScroll } from "./js/chart.js";
-import { diaryNow, drawDiary, drawDiaryShell, initDiary } from "./js/diary.js";
+import { diaryNow, diaryPrefill, drawDiary, drawDiaryShell, initDiary, prefillFromUrl } from "./js/diary.js";
 import { canCard, oqrnCardUrl, pageUrl } from "./js/card.js";
 import { mazume } from "./js/daydata.js";
 import { initMapPick, openMapPick } from "./js/mappick.js";
@@ -713,11 +713,17 @@ function init() {
   });
   // ?q=20.4253,136.0814 や ?q=城ヶ島 のリンクで、その場所を開く
   const q = new URLSearchParams(location.search).get("q");
+  // ボットの釣りの記録からのリンク（&d=日にち&c=釣果）：場所を開いたら、日記のタブで、その日の釣果を入れた「日記を書く」を開く
+  // （go がアドレス欄を ?q= だけにするので、先に読んでおく）
+  const pre = prefillFromUrl(location.search);
+  const opened = (p) => go(p, p === known ? {} : { ask: true }).then(() => {
+    if (pre) { showTab("diary", true); diaryPrefill(pre); }
+  });
   const last = (store.get("umiqru:recent") || [])[0];
   // 最近見た場所と同じリンクなら、覚えている場所（同じ名前のほかの候補つき）で開く
   const known = q && (store.get("umiqru:recent") || []).find(p => placeParam(p) === q);
-  if (known) go(known);
-  else if (q) findPlace(q).then(p => go(p, { ask: true })).catch(e => { doneNote(e.message, true); });
+  if (known) opened(known);
+  else if (q) findPlace(q).then(opened).catch(e => { doneNote(e.message, true); });
   else if (last) go(last);
   else findPlace(DEFAULT_PLACE).then(go).catch(e => { doneNote(e.message, true); });
 }

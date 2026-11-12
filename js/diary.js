@@ -75,6 +75,47 @@ export function initDiary(h) {
   onInstallChange(drawWhere);
   load();
 }
+/**
+ * ボット（くらぶボットの釣り）のリンクから：その日の釣果を入れた「日記を書く」を開く（残すのは、使う人が「残す」を押したとき）。
+ * pre … { ymd: "2026-11-12", items: [{ at: 402（0時からの分）, fish: "アジ" }] }。場所はページで開いている場所（リンクの ?q=）
+ */
+export function diaryPrefill(pre) {
+  if (!now?.place || !pre?.items?.length) return false;
+  forgetFresh();
+  dropped = [];
+  const list = [...pre.items].sort((a, b) => a.at - b.at);
+  editing = { ymd: pre.ymd, start: list[0].at, end: null, saw: {}, did: ["釣り"], memo: "" };
+  // 魚の名前がない釣果も残るように「魚」（日記は、写真も魚もない行を残さない）。あとで直せる
+  items = list.map(it => ({ id: newId(), at: it.at, photo: null, fish: it.fish || "魚", count: "", size: "" }));
+  editYmd = null;
+  selected = pre.ymd; month = pre.ymd.slice(0, 7);
+  drawCalendar();
+  drawForm();
+  drawDay();
+  // 同じ日・同じ場所の日記がもうあれば、かさならないように知らせる（残すかは使う人が決める）
+  const same = entries.some(x => x.ymd === pre.ymd && x.place && Math.abs(x.place.lat - now.place.lat) < 0.002 && Math.abs(x.place.lon - now.place.lon) < 0.002);
+  const note = document.createElement("p");
+  note.className = "muted small diary-note";
+  note.textContent = `${NAMES.bot}の釣りの記録から入れました。${same ? "この日・この場所の日記がもうあります。かさなるときは「やめる」を押してください。" : "よければ「残す」を押してください。"}`;
+  document.querySelector("#diary-form .diary-form-title")?.after(note);
+  document.getElementById("diary-form").scrollIntoView({ block: "start" });
+  return true;
+}
+
+/** リンクの ?d=2026-11-12&c=0642~アジ_0810~ を読む（なければ null）。魚の名前は30字まで */
+export function prefillFromUrl(search) {
+  const q = new URLSearchParams(search);
+  const ymd = q.get("d") || "";
+  if (!/^\d{4}-\d\d-\d\d$/.test(ymd) || !canKeepDay(ymd)) return null;
+  const list = String(q.get("c") || "").split("_").map(x => {
+    const [t, fish = ""] = x.split("~");
+    if (!/^\d{4}$/.test(t || "")) return null;
+    const at = Number(t.slice(0, 2)) * 60 + Number(t.slice(2));
+    return at < 1440 ? { at, fish: fish.slice(0, 30) } : null;
+  }).filter(Boolean).slice(0, 30);
+  return list.length ? { ymd, items: list } : null;
+}
+
 // render のたびに：いま見ている場所・日時
 export function diaryNow(v) {
   now = v;
