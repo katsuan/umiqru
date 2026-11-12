@@ -281,7 +281,7 @@ select.ls-input { appearance: none; -webkit-appearance: none; color: var(--text)
 .items { display: grid; gap: 8px; }
 .items:empty { display: none; }
 .item { display: grid; grid-template-columns: 64px minmax(0, 1fr) 40px; gap: 8px; align-items: start; }
-.item-pic { width: 64px; height: 64px; border-radius: 8px; background: var(--band); display: grid; place-items: center; color: var(--text-3); overflow: hidden; }
+.item-pic { width: 64px; height: 64px; border-radius: 8px; background: var(--band); display: grid; place-items: center; color: var(--text-3); overflow: hidden; cursor: pointer; } /* 押すとその釣果に写真をつける（中に見えない写真の欄） */
 .item-pic img { width: 100%; height: 100%; object-fit: cover; }
 .item-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
 .item-fields .ls-input { padding-inline: 8px; min-width: 0; }

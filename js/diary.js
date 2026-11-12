@@ -20,6 +20,7 @@ const SAW = [
 ];
 const DID = ["釣り", "サーフィン", "磯あそび", "散歩", "ほか"];
 const PHOTO_PX = 1600; // 写真は長い辺をここまで小さくして残す
+const PHOTO_MATCH_MIN = 15; // 「写真を足す」の写真を、写真のない釣果につける時刻の差（分）
 const EXPORT_TAG = "umiqru-diary";
 
 // app.js が入れるもの：いま見ている場所・日時（render のたびに）、ページを動かす関数
@@ -463,7 +464,7 @@ function drawForm() {
     <p class="muted small diary-note" id="diary-snapnote"></p>
     ${isoField(e)}
     <div class="ls-field"><span class="ls-label">写真・釣果</span>
-      <p class="muted small diary-note">写真は撮った時刻で並びます（わからないときは、はじめの時刻）。時刻と魚はあとから直せます。</p>
+      <p class="muted small diary-note">釣果の左の丸を押すと、その釣果に写真がつきます。「写真を足す」の写真は、撮った時刻から${PHOTO_MATCH_MIN}分以内の写真のない釣果につき、なければ撮った時刻で新しく並びます。時刻と魚はあとから直せます。</p>
       <div class="items" id="diary-items"></div>
       <div class="item-add">
         <label class="ls-button">${icon("camera")}写真を足す<input type="file" accept="image/*" multiple class="vh" data-pic-input></label>
@@ -521,7 +522,7 @@ function drawAt() {
 }
 
 const itemRow = (it, i) => `<div class="item" data-item="${i}">
-  <span class="item-pic">${it.photo ? `<img data-photo="${esc(it.photo)}" alt="写真 ${i + 1}">` : icon("target")}</span>
+  <label class="item-pic" aria-label="${it.photo ? "写真をとりかえる" : "この釣果に写真をつける"}">${it.photo ? `<img data-photo="${esc(it.photo)}" alt="写真 ${i + 1}">` : icon("camera")}<input type="file" accept="image/*" class="vh" data-pic-for="${i}"></label>
   <div class="item-fields">
     <input type="time" class="ls-input" name="at" value="${toInput(it.at)}" aria-label="時刻">
     <input class="ls-input" name="fish" placeholder="魚" value="${esc(it.fish || "")}" aria-label="魚の名前">
@@ -546,6 +547,15 @@ function readItems() {
     it.count = row.querySelector('[name="count"]').value.trim();
     it.size = row.querySelector('[name="size"]').value.trim();
   });
+}
+
+/** 写真を小さくして、まだ残していない写真として覚える。写真の id を返す */
+async function keepPhoto(file) {
+  const p = await shrink(file);
+  const id = newId();
+  fresh.set(id, p);
+  urls.set(id, URL.createObjectURL(new Blob([p.buf], { type: p.type })));
+  return id;
 }
 
 // ---- 写真の撮った時刻（JPEG の Exif。なければファイルの時刻）。その日のものでなければ null ----
@@ -764,15 +774,31 @@ async function onChange(ev) {
     readForm();
     for (const file of files) {
       try {
-        const at = await takenAt(file, editing.ymd);
-        const p = await shrink(file);
-        const id = newId();
-        fresh.set(id, p);
-        urls.set(id, URL.createObjectURL(new Blob([p.buf], { type: p.type })));
-        items.push({ id: newId(), at: at ?? editing.start, photo: id, fish: "", count: "", size: "" });
+        const at = (await takenAt(file, editing.ymd)) ?? editing.start;
+        const id = await keepPhoto(file);
+        // 撮った時刻から PHOTO_MATCH_MIN 分以内に、写真のない釣果があれば、いちばん近いものにつける（ボットから入れた釣果など）
+        const near = items.filter(it => !it.photo && it.fish && Math.abs(it.at - at) <= PHOTO_MATCH_MIN).sort((a, b) => Math.abs(a.at - at) - Math.abs(b.at - at))[0];
+        if (near) near.photo = id;
+        else items.push({ id: newId(), at, photo: id, fish: "", count: "", size: "" });
       } catch { /* 読めない写真は飛ばす */ }
     }
     items.sort((a, b) => a.at - b.at);
+    drawItems();
+  } else if (t.matches("[data-pic-for]")) {
+    // 行の丸から：その釣果に写真をつける（あればとりかえる。時刻はそのまま）
+    const it = items[Number(t.dataset.picFor)];
+    const file = t.files[0];
+    t.value = "";
+    if (!it || !file) return;
+    readForm();
+    try {
+      const id = await keepPhoto(file);
+      if (it.photo) {
+        if (fresh.has(it.photo)) fresh.delete(it.photo);
+        else dropped.push(it.photo);
+      }
+      it.photo = id;
+    } catch { return; }
     drawItems();
   } else if (t.matches('[name="ymd"], [name="start"]') && editing) {
     readForm();
