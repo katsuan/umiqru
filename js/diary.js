@@ -116,16 +116,23 @@ const botId = () => { const id = store.get(BOT_KEY); return typeof id === "strin
 /**
  * ボットに送る文（ボットが読む形。人が読んでもわかるように）：
  *   📔 うみくるの日記 2026-11-12 ／ 📍 緯度,経度 場所 ／ 潮：港（tide736.net）／ 06:42 アジ 2匹 20cm｜潮 上げ2分 32cm（60%）
- * 釣果（魚の名前のあるもの）だけ。潮はうみくるの港（tide736）のその時刻の値
+ * 釣果（魚の名前のあるもの）だけ。潮はうみくるの港（tide736）のその時刻の値。そのあとに、その日1日の潮（潮位：20分ごと … ／ 満干：…）
  */
 function botText(e) {
   const list = [...itemsOf(e)].filter(it => it.fish).sort((a, b) => a.at - b.at).slice(0, 20);
   const port = list.map(it => condAt(e, it.at)?.tide?.port).find(Boolean);
   const clean = v => String(v ?? "").replace(/[\r\n｜]/g, " ").trim();
+  // その日1日の潮（ボットはこれで、その日の記録の潮を直す）：20分ごとの潮位と、満潮・干潮
+  const td = e.day?.tide;
+  const cms = Array.isArray(td?.cm) ? td.cm.map(v => (v == null ? "" : Math.round(v))) : [];
+  const marks = td ? [...(td.flood || []).map(x => ({ k: "満潮", ...x })), ...(td.edd || []).map(x => ({ k: "干潮", ...x }))]
+    .filter(x => x.time).sort((a, b) => toMin(a.time) - toMin(b.time)).map(x => `${x.k} ${x.time} ${Math.round(x.cm)}`) : [];
   return [
     `📔 ${NAMES.app}の日記 ${e.ymd}`,
     `📍 ${Number(e.place.lat).toFixed(4)},${Number(e.place.lon).toFixed(4)} ${clean(e.placeTitle || e.place.name || "")}`.trim(),
     port ? `潮：${port.name || port}（${NAMES.tide736}）` : "",
+    cms.length >= 72 ? `潮位：20分ごと ${cms.join(" ")}` : "",
+    marks.length ? `満干：${marks.join("・")}` : "",
     ...list.map(it => {
       const t = condAt(e, it.at)?.tide;
       const fish = [clean(it.fish), it.count ? `${clean(it.count)}匹` : "", it.size ? `${clean(it.size)}cm` : ""].filter(Boolean).join(" ");
@@ -134,6 +141,8 @@ function botText(e) {
     }),
   ].filter(Boolean).join("\n");
 }
+/** "6:10" → 370（0時からの分） */
+const toMin = t => { const [h, m] = String(t).trim().split(":").map(Number); return h * 60 + m; };
 /** その日記を、ボットとのトークの入力欄に入れて開く URL（ボットを知らない・釣果がなければ ""） */
 function botUrl(e) {
   const id = botId();
