@@ -123,11 +123,14 @@ export function initMapPick(copy) {
       <strong>地図で選ぶ</strong>
       <button type="button" class="ls-icon-button" data-map-close aria-label="閉じる">${icon("close")}</button>
     </div>
-    <div class="ls-chips" id="map-layer" role="group" aria-label="地図の種類">
-      ${Object.entries(TILES).map(([k, t]) => `<button type="button" class="ls-chip" data-layer="${k}" aria-pressed="${k === "std"}">${t.label}</button>`).join("")}
+    <div class="map-tools">
+      <div class="ls-chips" id="map-layer" role="group" aria-label="地図の種類">
+        ${Object.entries(TILES).map(([k, t]) => `<button type="button" class="ls-chip" data-layer="${k}" aria-pressed="${k === "std"}">${t.label}</button>`).join("")}
+      </div>
+      <button type="button" class="ls-chip" id="map-here">${icon("place")}現在地</button>
     </div>
     <div id="map-box" class="map-box"></div>
-    <p class="map-legend small"><span class="dot is-tide"></span>${NAMES.tideTable}（${NAMES.tide736}）の港　<span class="dot is-jma"></span>${NAMES.jma}の潮位表　<span class="dot is-both"></span>両方</p>
+    <p class="map-legend small"><span class="key"><span class="dot is-tide"></span>${NAMES.tideTable}（${NAMES.tide736}）の港</span><span class="key"><span class="dot is-jma"></span>${NAMES.jma}の潮位表</span><span class="key"><span class="dot is-both"></span>両方</span></p>
     <p class="muted small" id="map-note"></p>
     <p class="map-ll"><span class="sub small">緯度, 経度</span> <strong id="map-ll">—</strong></p>
     <label class="map-name"><span class="sub small">名前（なくてもよい。磯の名前など）</span>
@@ -145,6 +148,21 @@ export function initMapPick(copy) {
     if (ev.target === dlg || ev.target.closest("[data-map-close]")) { close(); return; }
     const l = ev.target.closest("[data-layer]");
     if (l && map) setLayer(l.dataset.layer);
+  });
+  // 現在地：今いる場所に寄せてピンを置く（そこから動かしたり、近くの潮の地点の丸を押したりできる）
+  $("map-here").addEventListener("click", () => {
+    const note = $("map-note");
+    if (!navigator.geolocation) { note.textContent = "この端末では今いる場所を使えません"; return; }
+    if (!map || !window.L) return;
+    note.textContent = "今いる場所をたしかめています…";
+    navigator.geolocation.getCurrentPosition(pos => {
+      const ll = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      map.setView([ll.lat, ll.lng], Math.max(map.getZoom(), 14));
+      place(window.L, ll);
+      $("map-name").value = "";
+      note.textContent = "今いる場所にピンを置きました（少しずれることがあります。ピンは動かせます）。";
+    }, () => { note.textContent = "今いる場所を使えませんでした（位置情報の許可を確かめてください）"; },
+    { maximumAge: 10 * 60 * 1000, timeout: 15000, enableHighAccuracy: true });
   });
   $("map-copy").addEventListener("click", ev => { if (picked) copy(named, ev.currentTarget); });
   const go = () => { if (!picked) return; const q = named(); close(); onPick?.(q); };

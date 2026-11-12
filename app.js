@@ -619,14 +619,7 @@ function init() {
     input.value = q;
     document.getElementById("place-form").requestSubmit();
   }));
-  document.getElementById("here").addEventListener("click", () => {
-    if (!navigator.geolocation) { statusEl().textContent = "この端末では今いる場所を使えません"; return; }
-    busy("今いる場所をたしかめています…", { button: "さがし中…" });
-    navigator.geolocation.getCurrentPosition(
-      pos => go({ name: "今いる場所", lat: +pos.coords.latitude.toFixed(3), lon: +pos.coords.longitude.toFixed(3) }),
-      () => { doneNote("今いる場所を使えませんでした", true); },
-      { maximumAge: 10 * 60 * 1000, timeout: 15000 });
-  });
+  // 今いる場所は「地図で選ぶ」の中の「現在地」で（js/mappick.js）
   const days = document.getElementById("days");
   days.innerHTML = Array.from({ length: DAYS }, (_, i) => `<button type="button" data-i="${i}">${dayLabel(i).text}</button>`).join("");
   days.addEventListener("click", ev => {

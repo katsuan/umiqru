@@ -361,8 +361,11 @@ details.diary-keep summary { cursor: pointer; color: var(--text-3); }
 details.diary-keep p { margin: 8px 0 0; }
 .entry-send { margin-top: 8px; }
 .entry-bot { margin-top: 8px; }
+/* 地図で選ぶ：地図・写真の切りかえと「現在地」を1行に */
+.map-tools { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 /* 地図で選ぶ：潮の地点の丸の見分け方（js/mappick.js の MARK と同じ色） */
-.map-legend { margin: 8px 0 0; color: var(--text-2); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.map-legend { margin: 8px 0 0; color: var(--text-2); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; }
+.map-legend .key { white-space: nowrap; } /* 丸と字は、ひとまとまりで折りかえす */
 .map-legend .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 3px solid #0e6e9e; background: #fff; vertical-align: -2px; margin-right: 4px; }
 .map-legend .dot.is-jma { border-color: #6250d6; }
 .map-legend .dot.is-both { border-color: #0e6e9e; background: #6250d6; } /* 「くらぶボットに送る」は別の行に（3つ並べるとスマホの幅に入らない） */
