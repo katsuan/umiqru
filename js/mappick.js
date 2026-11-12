@@ -1,8 +1,9 @@
-// うみくる：地図から場所を選ぶ窓（押した所・動かしたピンの緯度経度で見る。名前もつけられる）
+// うみくる：地図から場所を選ぶ窓（押した所・動かしたピンの緯度経度で見る。名前もつけられる。寄ると潮汐表のある港の丸）
 // 地図は国土地理院のタイル（標準・写真）を Leaflet で。Leaflet は窓を初めて開いたときだけ読む
 // 読まれるところ：app.js（検索欄の横の地図のボタン）
 import { NAMES } from "./names.js";
 import { closeDialog, icon, openDialog } from "./format.js";
+import { loadPorts } from "./place.js";
 
 const LEAFLET = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/";
 const TILES = {
@@ -10,6 +11,7 @@ const TILES = {
   photo: { label: "写真", url: "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg", max: 18 },
 };
 const JAPAN = { lat: 35.0, lon: 136.0, zoom: 5 };
+const PORT_ZOOM = 9; // 港のピン（潮汐表のある港）は、この大きさより寄ったときだけ出す（日本全体だと多すぎる）
 const round = v => +v.toFixed(4);
 
 let leafletP = null;
@@ -26,7 +28,7 @@ function loadLeaflet() {
   });
 }
 
-let map = null, pin = null, layers = {}, onPick = null, picked = null;
+let map = null, pin = null, layers = {}, onPick = null, picked = null, ports = null;
 const $ = id => document.getElementById(id);
 
 function show(ll) {
@@ -48,6 +50,23 @@ function setLayer(key) {
   document.querySelectorAll("#map-layer [data-layer]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.layer === key)));
 }
 
+// 潮汐表のある港のピン（data/ports.json）。押すと、その港の位置と名前を選ぶ。寄ったときだけ出す
+function addPorts(L) {
+  loadPorts().then(list => {
+    const canvas = L.canvas({ padding: 0.3, tolerance: 10 }); // 指でも押せるように、まわり10pxまで
+    ports = L.layerGroup(list.map(p => L.circleMarker([p.lat, p.lon], { renderer: canvas, radius: 8, weight: 3, color: "#0e6e9e", fillColor: "#ffffff", fillOpacity: 1 })
+      .bindTooltip(p.name, { direction: "top", offset: [0, -6] })
+      .on("click", ev => {
+        L.DomEvent.stopPropagation(ev);
+        place(L, ev.latlng);
+        $("map-name").value = p.name;
+      })));
+    const toggle = () => { if (map.getZoom() >= PORT_ZOOM) ports.addTo(map); else ports.remove(); };
+    map.on("zoomend", toggle);
+    toggle();
+  }).catch(() => {});
+}
+
 // 開く。from … いま見ている場所（なければ日本全体）。pick({lat, lon, name}) … 「ここを見る」で呼ぶ
 export async function openMapPick(from, pick) {
   onPick = pick;
@@ -58,7 +77,7 @@ export async function openMapPick(from, pick) {
   let L;
   try { L = await loadLeaflet(); }
   catch (e) { $("map-note").textContent = e.message; return; }
-  $("map-note").textContent = "地図を押すか、ピンを動かして場所を決めます。写真にすると磯や岩も見えます。";
+  $("map-note").textContent = "地図を押すか、ピンを動かして場所を決めます。寄ると、潮汐表のある港が丸で出ます（押すとその港）。写真にすると磯や岩も見えます。";
   if (!map) {
     map = L.map("map-box", { zoomControl: true, attributionControl: true });
     map.attributionControl.setPrefix(false);
@@ -66,6 +85,7 @@ export async function openMapPick(from, pick) {
     layers = Object.fromEntries(Object.entries(TILES).map(([k, t]) => [k, L.tileLayer(t.url, { maxZoom: t.max, attribution: attr })]));
     setLayer("std");
     map.on("click", ev => place(L, ev.latlng));
+    addPorts(L);
   }
   if (from) { map.setView([from.lat, from.lon], 13); place(L, { lat: from.lat, lng: from.lon }); }
   else if (!pin) map.setView([JAPAN.lat, JAPAN.lon], JAPAN.zoom);
