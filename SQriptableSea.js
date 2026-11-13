@@ -8,7 +8,7 @@
 // 新しい版が出ると通知で知らせます。入れかえ方は https://katsuan.github.io/umiqru/#howto
 // ======================================
 
-const SEA_BUILD = "4128724f68";
+const SEA_BUILD = "17a0294aa6";
 
 const PALETTE = {
   brand: "#6C47FF",
@@ -871,6 +871,7 @@ const SEA = {
   page: "https://katsuan.github.io/umiqru/",
   names: { page: "うみくる", jma: "気象庁", tide: "潮汐表" },
   portMaxKm: 30,
+  isoNextHour: 14,
   palette: {
     ecmwf: ["#2A78D6", "#3987E5"],
     noaa: ["#EB6834", "#D95926"],
@@ -1101,7 +1102,7 @@ function seaIsoOn(iso, day) {
 
 function seaIsoLine(d, now) {
   if (!d.iso) return null;
-  const tomorrow = now.getHours() >= 12;
+  const tomorrow = now.getHours() >= SEA.isoNextHour;
   const list = seaIsoOn(d.iso, ymd(addDays(now, tomorrow ? 1 : 0)));
   if (!list) return null;
   const pick = d.iso.pick && d.iso.pick.length ? list.filter((x) => d.iso.pick.includes(x.ferry)) : list;
@@ -1474,7 +1475,7 @@ defineCard("sea", {
   icon: "🌊",
   label: "海",
   aliases: ["umi", "marine", "海", "波", "釣り"],
-  help: `波・風・潮をグラフで（sea:城ヶ島 / sea:20.4253,136.0814 / 空なら今いる場所 / sea:城ヶ島,wave,wind で出すものを選ぶ（wave 波・tide 潮・wind 風） / deg で風の向きを角度に / 小で出すものを書かなければ、そのとき大事な1つ（警報・強い風・高い波・まづめ） / 磯割のある島（鵜来島）は、下の行に渡船ごとのその日の磯（12時からはあす）。sea:鵜来島,家中 で渡船を選ぶ（いくつでも）。アプリの「🌊 海の Parameter を作る」で作れる）。${SEA.names.jma}の波の文と警報・注意報、近い港の${SEA.names.tide}を先に、緯度経度で読む波4つ・風4つの予報をあとに。押すと${SEA.names.page}が開く`,
+  help: `波・風・潮をグラフで（sea:城ヶ島 / sea:20.4253,136.0814 / 空なら今いる場所 / sea:城ヶ島,wave,wind で出すものを選ぶ（wave 波・tide 潮・wind 風） / deg で風の向きを角度に / 小で出すものを書かなければ、そのとき大事な1つ（警報・強い風・高い波・まづめ） / 磯割のある島（鵜来島）は、下の行に渡船ごとのその日の磯（14時からはあす）。sea:鵜来島,家中 で渡船を選ぶ（いくつでも）。アプリの「🌊 海の Parameter を作る」で作れる）。${SEA.names.jma}の波の文と警報・注意報、近い港の${SEA.names.tide}を先に、緯度経度で読む波4つ・風4つの予報をあとに。押すと${SEA.names.page}が開く`,
   keep: (d) => d,
   load: loadSea,
   refreshAt(d, ctx) {
