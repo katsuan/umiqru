@@ -528,7 +528,7 @@ function drawHowto() {
       <tr><td><code class="param">城ヶ島</code><span class="muted">（小）</span></td><td class="wrap">小は、そのとき大事な1つ（強風・波浪の注意報、強い風・高い波、まづめの前後なら潮、ふだんは波）</td></tr>
       <tr><td><code class="param">城ヶ島,wave,wind</code></td><td class="wrap">書いたものだけを書いた順に（wave 波・tide 潮・wind 風）</td></tr>
       <tr><td><code class="param">城ヶ島,wind,deg</code></td><td class="wrap">風のグラフだけ・向きを角度で</td></tr>
-      <tr><td><code class="param">鵜来島,家中</code></td><td class="wrap">磯割のある島は、大・中の下の行に渡船ごとの磯（14時からはあすのぶん）。渡船の名前を書くと、その渡船だけ（いくつでも）</td></tr>
+      <tr><td><code class="param">鵜来島,家中</code></td><td class="wrap">磯割のある島は、大・中の下の行に渡船ごとの磯（14時までは今日のぶんを「昼釣り」、そこからは「明日」。4/15〜7/15 は13〜18時に次の日のぶんを「夕釣り」。時刻と季節はスクリプトのいちばん上の ISO_TIMES で変えられます）。渡船の名前を書くと、その渡船だけ（いくつでも）</td></tr>
     </tbody>`;
   document.getElementById("howto-note").textContent = `ウィジェットは iOS の都合で15分〜1時間ごとに描き直されます。Parameter の「,」や「:」が消えてしまうときは、${S} の中で「${W}」を一度開いて、出てくるメニューで作った Parameter を貼ってください。`;
   document.getElementById("copy-script").onclick = ev => copyText(loadScript, ev.currentTarget);

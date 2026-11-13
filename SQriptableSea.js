@@ -8,7 +8,15 @@
 // 新しい版が出ると通知で知らせます。入れかえ方は https://katsuan.github.io/umiqru/#howto
 // ======================================
 
-const SEA_BUILD = "17a0294aa6";
+// ---- ここは変えてかまいません（新しい版に入れかえたら、また書きなおしてください） ----
+const ISO_TIMES = {
+  // 磯割（鵜来島など）を、いつ次の日のぶんにするか。数字は時（0〜23）、日にちは「月-日」
+  next: 14, // ふだんは、この時から「明日」の磯割。それまでは今日のぶんを「昼釣り」として
+  evening: { from: "04-15", to: "07-15", start: 13, end: 18 }, // 夕釣りの季節（from〜to）は、start〜end 時に次の日の磯割を「夕釣り」として。end からは「明日」
+};
+// ---- ここまで ----
+
+const SEA_BUILD = "1b40f0b45c";
 
 const PALETTE = {
   brand: "#6C47FF",
@@ -29,6 +37,8 @@ const FAMILIES = {
   accessoryInline: { name: "ロック画面（1行）", maxCards: 2, present: "presentAccessoryInline" },
   accessoryCircular: { name: "ロック画面（丸）", maxCards: 1, present: "presentAccessoryCircular" },
 };
+
+const WEEK_JA = ["日", "月", "火", "水", "木", "金", "土"];
 
 const THEMES = {
   light: { bg: "#F4F2FB", tile: "#FFFFFF", text: "#1B1730", sub: "#6B6585", track: "#E6E2F3" },
@@ -652,6 +662,10 @@ function ymd(date) {
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
 }
 
+function md(date) {
+  return `${date.getMonth() + 1}/${date.getDate()}(${WEEK_JA[date.getDay()]})`;
+}
+
 function addDays(date, n) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + n);
 }
@@ -871,7 +885,6 @@ const SEA = {
   page: "https://katsuan.github.io/umiqru/",
   names: { page: "うみくる", jma: "気象庁", tide: "潮汐表" },
   portMaxKm: 30,
-  isoNextHour: 14,
   palette: {
     ecmwf: ["#2A78D6", "#3987E5"],
     noaa: ["#EB6834", "#D95926"],
@@ -1100,15 +1113,26 @@ function seaIsoOn(iso, day) {
   return p.ferries.map((f) => ({ ferry: f.name, color: f.color || null, group: ex[f.name] || p.groups[(((k + f.shift) % n) + n) % n] }));
 }
 
+function seaIsoWhen(now, t = ISO_TIMES) {
+  const h = now.getHours();
+  const md = ymd(now).slice(5);
+  const ev = t.evening;
+  if (ev && (ev.from <= ev.to ? md >= ev.from && md <= ev.to : md >= ev.from || md <= ev.to)) {
+    if (h < ev.start) return { next: false, label: "昼釣り" };
+    return { next: true, label: h < ev.end ? "夕釣り" : "明日" };
+  }
+  return h < t.next ? { next: false, label: "昼釣り" } : { next: true, label: "明日" };
+}
+
 function seaIsoLine(d, now) {
   if (!d.iso) return null;
-  const tomorrow = now.getHours() >= SEA.isoNextHour;
-  const list = seaIsoOn(d.iso, ymd(addDays(now, tomorrow ? 1 : 0)));
+  const when = seaIsoWhen(now);
+  const list = seaIsoOn(d.iso, ymd(addDays(now, when.next ? 1 : 0)));
   if (!list) return null;
   const pick = d.iso.pick && d.iso.pick.length ? list.filter((x) => d.iso.pick.includes(x.ferry)) : list;
   if (!pick.length) return null;
   const item = (x, full) => ({ color: x.color, text: `${seaFerryShort(x.ferry)} ${full ? x.group : x.group.split("・")[0]}` });
-  return { when: tomorrow ? "あす" : "", full: pick.map((x) => item(x, true)), short: pick.map((x) => item(x, pick.length === 1)) };
+  return { when: when.label, full: pick.map((x) => item(x, true)), short: pick.map((x) => item(x, pick.length === 1)) };
 }
 
 function seaIsoDraw(row, iso, width, theme) {
@@ -1475,7 +1499,7 @@ defineCard("sea", {
   icon: "🌊",
   label: "海",
   aliases: ["umi", "marine", "海", "波", "釣り"],
-  help: `波・風・潮をグラフで（sea:城ヶ島 / sea:20.4253,136.0814 / 空なら今いる場所 / sea:城ヶ島,wave,wind で出すものを選ぶ（wave 波・tide 潮・wind 風） / deg で風の向きを角度に / 小で出すものを書かなければ、そのとき大事な1つ（警報・強い風・高い波・まづめ） / 磯割のある島（鵜来島）は、下の行に渡船ごとのその日の磯（14時からはあす）。sea:鵜来島,家中 で渡船を選ぶ（いくつでも）。アプリの「🌊 海の Parameter を作る」で作れる）。${SEA.names.jma}の波の文と警報・注意報、近い港の${SEA.names.tide}を先に、緯度経度で読む波4つ・風4つの予報をあとに。押すと${SEA.names.page}が開く`,
+  help: `波・風・潮をグラフで（sea:城ヶ島 / sea:20.4253,136.0814 / 空なら今いる場所 / sea:城ヶ島,wave,wind で出すものを選ぶ（wave 波・tide 潮・wind 風） / deg で風の向きを角度に / 小で出すものを書かなければ、そのとき大事な1つ（警報・強い風・高い波・まづめ） / 磯割のある島（鵜来島）は、下の行に渡船ごとのその日の磯（14時までは今日のぶんを昼釣り、そこからは明日。4/15〜7/15は13〜18時が次の日のぶんで夕釣り。スクリプトのいちばん上の ISO_TIMES で変えられる）。sea:鵜来島,家中 で渡船を選ぶ（いくつでも）。アプリの「🌊 海の Parameter を作る」で作れる）。${SEA.names.jma}の波の文と警報・注意報、近い港の${SEA.names.tide}を先に、緯度経度で読む波4つ・風4つの予報をあとに。押すと${SEA.names.page}が開く`,
   keep: (d) => d,
   load: loadSea,
   refreshAt(d, ctx) {
