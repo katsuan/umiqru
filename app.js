@@ -402,7 +402,13 @@ async function go(place, { ask = false } = {}) {
   try {
     const ctxP = placeContext(place);
     const token = state.token = {};
-    const tideP = ctxP.then(ctx => { state.ctx = ctx; return ctx.port ? loadTide(ctx.port, dayLabel(state.day).ymd).catch(() => null) : null; });
+    const tideP = ctxP.then(ctx => {
+      state.ctx = ctx;
+      if (!ctx.port) return null;
+      // つぎの日の潮も先に読む（その日の満潮・干潮が終わっていたら、つぎの日の分を出す。予報の読みこみを待たない）
+      loadTide(ctx.port, dayLabel(state.day + 1).ymd).then(() => { if (token === state.token && state.data) render(); }, () => {});
+      return loadTide(ctx.port, dayLabel(state.day).ymd).catch(() => null);
+    });
     const data = await loadForecasts(place, ctxP, part => {
       if (token !== state.token || !state.ctx) return;
       state.place = place; state.data = part;
