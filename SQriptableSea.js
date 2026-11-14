@@ -16,7 +16,7 @@ const ISO_TIMES = {
 };
 // ---- ここまで ----
 
-const SEA_BUILD = "1b40f0b45c";
+const SEA_BUILD = "50f52f8257";
 
 const PALETTE = {
   brand: "#6C47FF",
@@ -750,7 +750,9 @@ async function getJSON(url, key, maxAgeMin, item) {
   const fresh = readCache(key, maxAgeMin);
   if (fresh) return fresh;
   try {
-    const json = await request(url).loadJSON();
+    const req = request(url);
+    const json = await req.loadJSON();
+    if (req.response && req.response.statusCode >= 400) throw new Error(`HTTP ${req.response.statusCode}`);
     writeCache(key, json);
     return json;
   } catch (e) {
@@ -1156,8 +1158,10 @@ function seaIsoDraw(row, iso, width, theme) {
   });
 }
 
-async function loadSea(arg, ctx, item) {
-  const isoP = getJSON(`${SEA.page}data/isowari.json`, "sea_isowari.json", 60 * 24, item).catch(() => null);
+async function loadSea(arg, ctx) {
+  const stale = new Set();
+  const mark = (part) => ({ set stale(v) { if (v) stale.add(part); } });
+  const isoP = getJSON(`${SEA.page}data/isowari.json`, "sea_isowari.json", 60 * 24, mark("iso")).catch(() => null);
   const opt = seaOptions(arg, seaFerryOf(readCache("sea_isowari.json") || (await isoP)));
   const place = await seaPlace(opt.place);
   const port = seaNearestPort(place);
@@ -1170,18 +1174,18 @@ async function loadSea(arg, ctx, item) {
   const today = ymd(ctx.now);
   const [areaJma, waves, sea, msm, wind, tide, wx] = await Promise.all([
     soft(seaArea(place, port)),
-    soft(getJSON(`https://marine-api.open-meteo.com/v1/marine?${at}${q}&cell_selection=sea&hourly=wave_height,wave_direction&models=${SEA.waves.map((m) => m.key).join(",")}`, `sea_wave_${la}_${lo}.json`, 60, item)),
-    soft(getJSON(`https://marine-api.open-meteo.com/v1/marine?${at}${q}&cell_selection=sea&hourly=sea_surface_temperature,ocean_current_velocity,ocean_current_direction`, `sea_sst2_${la}_${lo}.json`, 120, item)),
-    soft(getJSON(windUrl(["jma_msm"]), `sea_msm_${la}_${lo}.json`, 60, item)),
-    soft(getJSON(windUrl(SEA.winds.slice(1).map((m) => m.key), true), `sea_wind2_${la}_${lo}.json`, 60, item)),
-    port ? soft(getJSON(`https://tide736.net/api/get_tide.php?pc=${port.pc}&hc=${port.hc}&yr=${ctx.now.getFullYear()}&mn=${ctx.now.getMonth() + 1}&dy=${ctx.now.getDate()}&rg=week`, `sea_tide_${port.pc}_${port.hc}_${today}.json`, 60 * 12, item)) : null,
-    soft(getJSON(`https://api.open-meteo.com/v1/forecast?${at}${q}&hourly=weather_code,is_day,temperature_2m,precipitation_probability`, `sea_wx_${la}_${lo}.json`, 60, item)),
+    soft(getJSON(`https://marine-api.open-meteo.com/v1/marine?${at}${q}&cell_selection=sea&hourly=wave_height,wave_direction&models=${SEA.waves.map((m) => m.key).join(",")}`, `sea_wave_${la}_${lo}.json`, 60, mark("wave"))),
+    soft(getJSON(`https://marine-api.open-meteo.com/v1/marine?${at}${q}&cell_selection=sea&hourly=sea_surface_temperature,ocean_current_velocity,ocean_current_direction`, `sea_sst2_${la}_${lo}.json`, 120, mark("sea"))),
+    soft(getJSON(windUrl(["jma_msm"]), `sea_msm_${la}_${lo}.json`, 60, mark("wind"))),
+    soft(getJSON(windUrl(SEA.winds.slice(1).map((m) => m.key), true), `sea_wind2_${la}_${lo}.json`, 60, mark("wind"))),
+    port ? soft(getJSON(`https://tide736.net/api/get_tide.php?pc=${port.pc}&hc=${port.hc}&yr=${ctx.now.getFullYear()}&mn=${ctx.now.getMonth() + 1}&dy=${ctx.now.getDate()}&rg=week`, `sea_tide_${port.pc}_${port.hc}_${today}.json`, 60 * 12, mark("tide"))) : null,
+    soft(getJSON(`https://api.open-meteo.com/v1/forecast?${at}${q}&hourly=weather_code,is_day,temperature_2m,precipitation_probability`, `sea_wx_${la}_${lo}.json`, 60, mark("wx"))),
   ]);
   if (!waves && !wind && !tide) throw new Error("sea: nothing");
   const [jmaJson, warnJson] = areaJma
     ? await Promise.all([
-      soft(getJSON(`https://www.jma.go.jp/bosai/forecast/data/forecast/${areaJma.office}.json`, `jma_fc_${areaJma.office}.json`, 60, item)),
-      soft(getJSON(`https://www.jma.go.jp/bosai/warning/data/warning/${areaJma.office}.json`, `jma_warn_${areaJma.office}.json`, 30, item)),
+      soft(getJSON(`https://www.jma.go.jp/bosai/forecast/data/forecast/${areaJma.office}.json`, `jma_fc_${areaJma.office}.json`, 60, mark("jma"))),
+      soft(getJSON(`https://www.jma.go.jp/bosai/warning/data/warning/${areaJma.office}.json`, `jma_warn_${areaJma.office}.json`, 30, mark("jma"))),
     ])
     : [null, null];
 
@@ -1243,6 +1247,7 @@ async function loadSea(arg, ctx, item) {
       pop: (wx.hourly.precipitation_probability || []).slice(0, 48),
     } : null,
     opt: { show: opt.show, deg: opt.deg },
+    stale: [...stale],
   };
 }
 
@@ -1537,16 +1542,18 @@ defineCard("sea", {
     const wd = seaRange(d.winds, i);
     const j = d.jma[0];
     const next = seaNext(d, now);
-    const warnColor = theme.warn;
     const waveText = wv ? wv.text : "—";
     const windText = `${seaDirText(d, d.windDir[i])} ${wd ? wd.text : "—"}`;
     const windShort = `${seaDirText(d, d.windDir[i])} ${wd ? (wd.hi >= 10 ? Math.round(wd.hi) : wd.hi.toFixed(1)) : "—"}`;
     const place = shortPlace(d.name);
+    const old = (k) => (d.stale || []).includes(k);
+    const pt = (k) => (old(k) ? ctx.faded || theme : theme);
+    const pc = (k) => (old(k) ? { ...ctx, theme: pt(k) } : ctx);
 
     if (ctx.accessory && tier !== "s") {
       const top = hrow(box, 4);
-      txt(top, "🌊", 11, theme.text);
-      txt(top, `${waveText}m`, 13, theme.text, "bold");
+      txt(top, "🌊", 11, pt("wave").text);
+      txt(top, `${waveText}m`, 13, pt("wave").text, "bold");
       top.addSpacer();
       txt(top, place, 9, theme.sub, "semibold", { scale: 0.6 });
       const mean = d.waves[0].v.map((_, k) => {
@@ -1554,20 +1561,20 @@ defineCard("sea", {
         return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
       });
       const gh = Math.max(10, h - 34);
-      seaPlot(box, seaGraph(w, gh, { series: [{ color: "#FFFFFF", v: mean }], from: view.from, i, theme }), w, gh);
-      txt(box, `💨${windText}m${next.tide ? ` ${next.tide.text}` : ""}`, 9, theme.sub, "semibold", { scale: 0.6 });
+      seaPlot(box, seaGraph(w, gh, { series: [{ color: "#FFFFFF", v: mean }], from: view.from, i, theme: pt("wave") }), w, gh);
+      txt(box, `💨${windText}m${next.tide ? ` ${next.tide.text}` : ""}`, 9, pt("wind").sub, "semibold", { scale: 0.6 });
       return;
     }
     if (tier === "s") {
       const oneLine = 12 + textWidth(`${waveText}m`, 13) * 1.15 + textWidth(`${windShort}m`, 11) * 1.15 + 26 <= w;
       const row = hrow(box, 6);
-      txt(row, "🌊", 12, theme.text);
-      txt(row, `${waveText}m`, 13, theme.text, "bold", { scale: 0.5 });
+      txt(row, "🌊", 12, pt("wave").text);
+      txt(row, `${waveText}m`, 13, pt("wave").text, "bold", { scale: 0.5 });
       row.addSpacer();
-      if (oneLine) txt(row, `${windShort}m`, 11, theme.sub, "semibold", { scale: 0.6 });
+      if (oneLine) txt(row, `${windShort}m`, 11, pt("wind").sub, "semibold", { scale: 0.6 });
       if (h >= 40) {
         const line = !oneLine ? `💨 ${windShort}m${d.warns.length ? ` ⚠️ ${d.warns[0]}` : ""}` : d.warns.length ? `⚠️ ${d.warns[0]}` : place;
-        txt(box, line, 10, d.warns.length ? warnColor : theme.sub, "semibold", { scale: 0.6 });
+        txt(box, line, 10, d.warns.length ? pt("jma").warn : pt(!oneLine ? "wind" : "jma").sub, "semibold", { scale: 0.6 });
       }
       return;
     }
@@ -1575,14 +1582,14 @@ defineCard("sea", {
     const head = hrow(box, 4);
     txt(head, place, tier === "l" ? 12 : 11, theme.sub, "semibold", { scale: 0.6 });
     head.addSpacer();
-    if (d.warns.length) txt(head, `⚠️ ${d.warns.length > 1 ? `${d.warns[0]} ほか` : d.warns[0]}`, 9, warnColor, "bold", { scale: 0.6 });
+    if (d.warns.length) txt(head, `⚠️ ${d.warns.length > 1 ? `${d.warns[0]} ほか` : d.warns[0]}`, 9, pt("jma").warn, "bold", { scale: 0.6 });
     const wx = d.wx && d.wx.code[i] != null ? d.wx : null;
     if (wx && (w >= 250 || !d.warns.length)) {
       const [emoji] = wmo(wx.code[i], wx.day[i]);
       const pop = wx.pop[i] != null ? `☔${wx.pop[i]}%` : "";
       const temp = wx.temp[i] != null ? `${Math.round(wx.temp[i])}°` : "";
-      txt(head, emoji, tier === "l" ? 11 : 10, theme.text);
-      txt(head, w >= 250 ? `${temp} ${pop}`.trim() : pop, tier === "l" ? 11 : 10, theme.sub, "semibold", { scale: 0.6 });
+      txt(head, emoji, tier === "l" ? 11 : 10, pt("wx").text);
+      txt(head, w >= 250 ? `${temp} ${pop}`.trim() : pop, tier === "l" ? 11 : 10, pt("wx").sub, "semibold", { scale: 0.6 });
     }
 
     const big = isBig(ctx);
@@ -1598,19 +1605,19 @@ defineCard("sea", {
     const tries = texts.flatMap((t) => sizes.map((size) => ({ t, size })));
     const { t: windMain, size: bigSize } = tries.find((x) => rowW("", x.t, x.size) <= w) || tries[tries.length - 1];
     const showJma = jmaText && rowW(jmaText, windMain, bigSize) <= w;
-    txt(main, "💨", big ? 15 : 12, theme.text);
-    txt(main, windMain, bigSize, theme.text, "round", { scale: 0.5 });
-    txt(main, "m/s", 11, theme.sub, "medium");
+    txt(main, "💨", big ? 15 : 12, pt("wind").text);
+    txt(main, windMain, bigSize, pt("wind").text, "round", { scale: 0.5 });
+    txt(main, "m/s", 11, pt("wind").sub, "medium");
     main.addSpacer();
     if (wide) {
-      if (showJma) txt(main, jmaText, 10, theme.sub, "semibold", { scale: 0.7 });
-      txt(main, "🌊", subSize, theme.text);
-      txt(main, `${waveText}m`, subSize, theme.text, "semibold", { scale: 0.6 });
+      if (showJma) txt(main, jmaText, 10, pt("jma").sub, "semibold", { scale: 0.7 });
+      txt(main, "🌊", subSize, pt("wave").text);
+      txt(main, `${waveText}m`, subSize, pt("wave").text, "semibold", { scale: 0.6 });
     } else {
-      txt(box, `🌊 ${waveText}m`, 10, theme.sub, "semibold", { scale: 0.6 });
+      txt(box, `🌊 ${waveText}m`, 10, pt("wave").sub, "semibold", { scale: 0.6 });
     }
     const wxLine = big && wide && j && j.weather;
-    if (wxLine) txt(box, `${SEA.names.jma} ${j.weather}`, 10, theme.sub, "semibold", { scale: 0.6 });
+    if (wxLine) txt(box, `${SEA.names.jma} ${j.weather}`, 10, pt("jma").sub, "semibold", { scale: 0.6 });
 
     const iso = seaIsoLine(d, now);
     const isoRow = !!iso && wide;
@@ -1627,18 +1634,20 @@ defineCard("sea", {
     const gustLine = (d.gust || []).some((v) => v != null) ? [{ label: "突風", dash: true, thin: true, v: d.gust }] : [];
     const extra = (g) => (g === "wind" ? SEA_ARROW_H + 2 : 0);
     const drawOne = (col, g, cw, gh, keys = true) => {
+      const th = pt(g);
+      const c = pc(g);
       if (g === "wave") {
-        seaLegend(col, "波 m", keys ? waveItems : [], 9, theme, cw);
-        seaWaveGraph(col, d, ctx, view, cw, gh);
+        seaLegend(col, "波 m", keys ? waveItems : [], 9, th, cw);
+        seaWaveGraph(col, d, c, view, cw, gh);
       } else if (g === "tide") {
-        seaLegend(col, tideTitle(cw), [], 9, theme, cw);
-        if (d.tide.length) seaTideGraph(col, d, ctx, view, cw, gh);
-        else txt(col, `${SEA.names.tide}は日本の港だけ`, 9, theme.sub, "medium");
+        seaLegend(col, tideTitle(cw), [], 9, th, cw);
+        if (d.tide.length) seaTideGraph(col, d, c, view, cw, gh);
+        else txt(col, `${SEA.names.tide}は日本の港だけ`, 9, th.sub, "medium");
       } else {
-        seaLegend(col, "風 m/s", keys ? [...d.winds.filter((m) => m.v.some((v) => v != null)), ...gustLine] : [], 9, theme, cw);
-        seaPlot(col, seaGraph(cw, gh - extra(g), { series: [...d.winds, ...gustLine], from: view.from, i, theme, bands: seaNightBands(d) }), cw, gh - extra(g));
+        seaLegend(col, "風 m/s", keys ? [...d.winds.filter((m) => m.v.some((v) => v != null)), ...gustLine] : [], 9, th, cw);
+        seaPlot(col, seaGraph(cw, gh - extra(g), { series: [...d.winds, ...gustLine], from: view.from, i, theme: th, bands: seaNightBands(d) }), cw, gh - extra(g));
         col.addSpacer(2);
-        seaWindArrows(col, d, ctx, view, cw);
+        seaWindArrows(col, d, c, view, cw);
       }
     };
     const chosen = d.opt && d.opt.show && d.opt.show.length ? d.opt.show : null;
@@ -1681,17 +1690,23 @@ defineCard("sea", {
     const foot = hrow(box, 8);
     const gust = (d.gust || [])[i];
     const cur = d.current && d.current.kn[i] != null ? `流れ ${d.current.dir[i] == null ? "" : `${seaDirText(d, d.current.dir[i])}へ`}${d.current.kn[i].toFixed(1)}kn` : "";
-    const parts = [next.tide && next.tide.text, next.mazume && (next.mazume.now ? `いま${next.mazume.k}` : next.mazume.text), gust != null ? `突風 ${gust}m/s` : "", cur, (d.sst || [])[i] != null && w >= 280 ? `水温 ${Math.round(d.sst[i])}℃` : ""].filter(Boolean);
+    const parts = [
+      { t: next.tide && next.tide.text, k: "tide" },
+      { t: next.mazume && (next.mazume.now ? `いま${next.mazume.k}` : next.mazume.text), k: "tide" },
+      { t: gust != null ? `突風 ${gust}m/s` : "", k: "wind" },
+      { t: cur, k: "sea" },
+      { t: (d.sst || [])[i] != null && w >= 280 ? `水温 ${Math.round(d.sst[i])}℃` : "", k: "sea" },
+    ].filter((p) => p.t);
     let left = w;
     parts.forEach((p) => {
-      if (textWidth(p, 9) + 8 > left) return;
-      left -= textWidth(p, 9) + 8;
-      txt(foot, p, 9, theme.sub, "semibold", { scale: 0.7 });
+      if (textWidth(p.t, 9) + 8 > left) return;
+      left -= textWidth(p.t, 9) + 8;
+      txt(foot, p.t, 9, pt(p.k).sub, "semibold", { scale: 0.7 });
     });
-    if (iso && !isoRow && left > 0) seaIsoDraw(foot, iso, left, theme);
+    if (iso && !isoRow && left > 0) seaIsoDraw(foot, iso, left, pt("iso"));
     if (isoRow) {
       box.addSpacer(2);
-      seaIsoDraw(hrow(box, 8), iso, w, theme);
+      seaIsoDraw(hrow(box, 8), iso, w, pt("iso"));
     }
   },
 });

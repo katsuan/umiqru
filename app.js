@@ -423,12 +423,45 @@ async function go(place, { ask = false } = {}) {
     history.replaceState(null, "", `?q=${encodeURIComponent(placeParam())}${location.hash}`);
     drawHowto();
     await refreshTide();
-    // MSM は日本のまわりだけなので、日本の外では読めなくてよい
-    const names = { wx: "天気", wind: "風", msm: state.ctx.jma ? "風（MSM）" : null, waves: "波", sea: "水温・海流・海面", jma: `${NAMES.jma}の予報`, amedas: NAMES.amedas, warn: `${NAMES.jma}の警報` };
-    const errs = data.errors.map(k => names[k]).filter(Boolean);
-    doneNote(errs.length ? `読めなかったもの：${errs.join("・")}` : `${name}を表示しました`, errs.length > 0);
+    failNote(`${name}を表示しました`);
     if (ask && place.alts?.length) altsToast(place);
   } catch (e) {
+    doneNote("読みこめませんでした。通信を確かめてください。", true);
+  }
+}
+// 読めなかったもの（予報の出どころと、潮汐表）。MSM は日本のまわりだけなので、日本の外では読めなくてよい
+function failed() {
+  const d = state.data, ctx = state.ctx;
+  if (!d || !ctx) return [];
+  const names = { wx: "天気", wind: "風", msm: ctx.jma ? "風（MSM）" : null, waves: "波", sea: "水温・海流・海面", jma: `${NAMES.jma}の予報`, amedas: NAMES.amedas, warn: `${NAMES.jma}の警報` };
+  const list = d.errors.filter(k => names[k]).map(k => ({ key: k, name: names[k] }));
+  if (ctx.port && !tideFor(dayLabel(state.day).ymd)) list.push({ key: "tide", name: NAMES.tideTable });
+  return list;
+}
+// 終わりの知らせ。読めなかったものがあれば、それだけ読みなおすボタンを付けて残す
+function failNote(okText) {
+  const errs = failed();
+  if (!errs.length) { doneNote(okText); return; }
+  doneNote("", true);
+  // qcheck-ok: W1 名前は上の決まった文字だけ（esc もする）
+  statusEl().innerHTML = `読めなかったもの：${esc(errs.map(e => e.name).join("・"))} <button type="button" class="ls-button status-retry" data-retry>${icon("refresh")}読みなおす</button>`;
+}
+// 読めなかったものだけを読みなおす（ほかの出どころは読みなおさない）
+async function retryFailed() {
+  const place = state.place, token = state.token, only = state.data.errors.slice();
+  busy("読みなおし中…");
+  try {
+    if (only.length) {
+      await loadForecasts(place, Promise.resolve(state.ctx), part => {
+        if (token !== state.token) return;
+        state.data = part;
+        render();
+      }, { base: state.data, only });
+    }
+    if (token !== state.token) return;
+    await refreshTide();
+    failNote("読みなおしました");
+  } catch {
     doneNote("読みこめませんでした。通信を確かめてください。", true);
   }
 }
@@ -449,6 +482,8 @@ const shareUrl = () => pageUrl(placeParam());
 let altsOpen = false;
 const placeInfo = document.getElementById("place-info");
 placeInfo.addEventListener("toggle", ev => { if (ev.target.matches("details.alts")) altsOpen = ev.target.open; }, true);
+// 読めなかったものだけ読みなおす（知らせの行のボタン）
+statusEl().addEventListener("click", ev => { if (ev.target.closest("[data-retry]")) retryFailed(); });
 document.getElementById("share").addEventListener("click", ev => {
   const share = ev.target.closest("#share-link");
   if (!share) return;

@@ -130,6 +130,8 @@
   .status { font-size: 13px; color: var(--text-3); margin: 0 0 16px; }
   /* 読みこみが終わって文がないときは、場所を取らない（空の行を残さない） */
   .status:empty { margin: 0; }
+  /* 読めなかったものを読みなおすボタン（知らせの行の中の小さいもの） */
+  .status .status-retry { padding: 0 12px; margin-left: 8px; font-size: 13px; vertical-align: middle; }
   /* 読みこみ中：ボタンに回る輪、知らせの行の下に流れる線、前の場所の表示はゆっくり明るく暗く */
   .status.is-busy { position: relative; overflow: hidden; color: var(--text); font-size: 14px; font-weight: 700; padding-bottom: 8px; }
   .status.is-busy::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; border-radius: 2px; background: var(--band); }

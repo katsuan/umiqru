@@ -7,6 +7,7 @@ import { km } from "./place.js";
 import { jmaPops, jmaText, loadAmedas } from "./jma.js";
 
 // 届いたものから順に state.data に入れて描き直す
+// opt.base・opt.only … 読めなかったものだけ読みなおす（base に、only の出どころだけを足しなおす）
 // opt.ymd … その1日だけ（日記に残すとき。前の日は、あとから読んだ値になる）。そのときは気象庁の「いま」のもの（文・警報・アメダス）は読まない
 export async function loadForecasts(place, ctxP, onPart, opt = {}) {
   const span = opt.ymd ? `start_date=${opt.ymd}&end_date=${opt.ymd}` : `forecast_days=${DAYS}`;
@@ -14,26 +15,29 @@ export async function loadForecasts(place, ctxP, onPart, opt = {}) {
   // 突風（wind_gusts_10m）は GFS・IFS だけが出す（気象庁の MSM・GSM は空）
   const windUrl = (models, gust = false) => `https://api.open-meteo.com/v1/forecast?${q}&hourly=wind_speed_10m,wind_direction_10m,precipitation${gust ? ",wind_gusts_10m" : ""}&wind_speed_unit=ms&models=${models.join(",")}`;
   // done … 届いた（読めなかったものも）出どころ。まだ届いていないグラフは「読みこみ中」と出すため
-  const out = { span, errors: [], done: [], text: {}, pops: [], wind: { hourly: {} } };
+  const want = k => !opt.only || opt.only.includes(k);
+  const out = opt.base || { span, errors: [], done: [], text: {}, pops: [], wind: { hourly: {} } };
+  // 読みなおすものは、まだ届いていないことにする（グラフは「読みこみ中」に）
+  if (opt.base) { out.errors = out.errors.filter(k => !want(k)); out.done = out.done.filter(k => !want(k)); onPart(out); }
   const finish = key => { out.done.push(key); onPart(out); };
   const part = (key, p, use, later = false) => p.then(v => { use(v); if (later) onPart(out); else finish(key); }, () => { out.errors.push(key); finish(key); });
   const jobs = [
     // 1つだけのときは名前に予報の名前が付かないので付けなおす
-    part("msm", getJSON(windUrl(["jma_msm"])), v => Object.entries(v.hourly).forEach(([k, a]) => { out.wind.hourly[k === "time" ? k : `${k}_jma_msm`] = a; })),
-    part("wind", getJSON(windUrl(WIND_MODELS.filter(m => m !== "jma_msm"), true)), v => Object.assign(out.wind.hourly, v.hourly)),
-    part("waves", getJSON(`https://marine-api.open-meteo.com/v1/marine?${q}&cell_selection=sea&hourly=wave_height,wave_period,wave_direction,swell_wave_height&models=${WAVE_MODELS.join(",")}`),
+    want("msm") && part("msm", getJSON(windUrl(["jma_msm"])), v => Object.entries(v.hourly).forEach(([k, a]) => { out.wind.hourly[k === "time" ? k : `${k}_jma_msm`] = a; })),
+    want("wind") && part("wind", getJSON(windUrl(WIND_MODELS.filter(m => m !== "jma_msm"), true)), v => Object.assign(out.wind.hourly, v.hourly)),
+    want("waves") && part("waves", getJSON(`https://marine-api.open-meteo.com/v1/marine?${q}&cell_selection=sea&hourly=wave_height,wave_period,wave_direction,swell_wave_height&models=${WAVE_MODELS.join(",")}`),
       v => { out.waves = v; }, true).then(() => out.waves && fillOffshore(place, out)).then(() => { if (!out.done.includes("waves")) finish("waves"); }),
-    part("sea", getJSON(`https://marine-api.open-meteo.com/v1/marine?${q}&cell_selection=sea&hourly=sea_surface_temperature,sea_level_height_msl,ocean_current_velocity,ocean_current_direction`), v => { out.sea = v; }),
-    part("wx", getJSON(`https://api.open-meteo.com/v1/forecast?${q}&hourly=weather_code,temperature_2m,precipitation_probability,precipitation&daily=sunrise,sunset`), v => { out.wx = v; }),
+    want("sea") && part("sea", getJSON(`https://marine-api.open-meteo.com/v1/marine?${q}&cell_selection=sea&hourly=sea_surface_temperature,sea_level_height_msl,ocean_current_velocity,ocean_current_direction`), v => { out.sea = v; }),
+    want("wx") && part("wx", getJSON(`https://api.open-meteo.com/v1/forecast?${q}&hourly=weather_code,temperature_2m,precipitation_probability,precipitation&daily=sunrise,sunset`), v => { out.wx = v; }),
   ];
   const ctx = await ctxP;
   if (ctx.jma && !opt.ymd) {
-    jobs.push(part("jma", getJSON(`https://www.jma.go.jp/bosai/forecast/data/forecast/${ctx.jma.office}.json`), v => {
+    if (want("jma")) jobs.push(part("jma", getJSON(`https://www.jma.go.jp/bosai/forecast/data/forecast/${ctx.jma.office}.json`), v => {
       out.jma = v; out.text = jmaText(v, ctx.jma.c10); out.pops = jmaPops(v, ctx.jma.c10);
     }));
     // いちばん近いアメダス（風を測っている所）の、いまの観測
-    jobs.push(part("amedas", loadAmedas(place), v => { out.amedas = v; }));
-    jobs.push(part("warn", getJSON(`https://www.jma.go.jp/bosai/warning/data/warning/${ctx.jma.office}.json`), v => { out.warn = v; }));
+    if (want("amedas")) jobs.push(part("amedas", loadAmedas(place), v => { out.amedas = v; }));
+    if (want("warn")) jobs.push(part("warn", getJSON(`https://www.jma.go.jp/bosai/warning/data/warning/${ctx.jma.office}.json`), v => { out.warn = v; }));
   }
   await Promise.all(jobs);
   out.errors = [...new Set(out.errors)];
