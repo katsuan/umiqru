@@ -166,8 +166,9 @@ export function prefillFromUrl(search) {
   const list = String(q.get("c") || "").split("_").map(x => {
     const [t, fish = ""] = x.split("~");
     if (!/^\d{4}$/.test(t || "")) return null;
-    const at = Number(t.slice(0, 2)) * 60 + Number(t.slice(2));
-    return at < 1440 ? { at, fish: fish.slice(0, 30) } : null;
+    const h = Number(t.slice(0, 2)), m = Number(t.slice(2));
+    // 時は 0〜23、分は 0〜59（「0175」を 2:15 と読まない）。字は文字ごとに数える（絵文字を半分で切らない）
+    return h < 24 && m < 60 ? { at: h * 60 + m, fish: [...fish].slice(0, 30).join("") } : null;
   }).filter(Boolean).slice(0, 30);
   return list.length ? { ymd, items: list } : null;
 }
@@ -576,7 +577,7 @@ async function keepPhoto(file) {
 }
 
 // ---- 写真の撮った時刻（JPEG の Exif。なければファイルの時刻）。その日のものでなければ null ----
-async function exifTime(file) {
+export async function exifTime(file) {
   const v = new DataView(await file.slice(0, 256 * 1024).arrayBuffer());
   if (v.getUint16(0) !== 0xFFD8) return null;
   let o = 2;
@@ -603,7 +604,7 @@ async function exifTime(file) {
   }
   return null;
 }
-async function takenAt(file, ymd) {
+export async function takenAt(file, ymd) {
   const ex = await exifTime(file).catch(() => null);
   if (ex) return ex.ymd === ymd ? ex.min : null;
   const jst = new Date(file.lastModified + 9 * 3600e3);

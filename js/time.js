@@ -23,7 +23,8 @@ export function dayLabel(i) {
   return { ymd, text: `${head}（${w}）`, short: `${m}月${d}日（${w}）` };
 }
 export const hm = t => { const [h, m] = t.trim().split(":").map(Number); return h + m / 60; };
-export const hmText = x => { const h = Math.floor(x), m = Math.round((x - h) * 60); return `${h}:${String(m).padStart(2, "0")}`; };
+// 時間（6.995）を "7:00" に。分に丸めてから時と分に分ける（59.7分を「60分」にしない）
+export const hmText = x => { const t = Math.round(x * 60), h = Math.floor(t / 60), m = t - h * 60; return `${h}:${String(m).padStart(2, "0")}`; };
 
 export const sliceDay = (arr, day) => arr ? arr.slice(day * 24, day * 24 + 25) : [];
 export const hourlyPoints = (arr, day) => sliceDay(arr, day).map((y, x) => ({ x, y: y ?? null }));

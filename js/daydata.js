@@ -95,8 +95,9 @@ function tideDay(t) {
 // near … 満潮・干潮の15分以内ならその名前
 function tideAt(t, min) {
   if (!t?.cm?.length) return null;
-  const k = min / 20, i = Math.max(0, Math.min(Math.floor(k), t.cm.length - 2)), f = k - i;
-  const cm = t.cm[i] + (t.cm[i + 1] - t.cm[i]) * f;
+  // 20分ごとの値の間をつなぐ。最後の値より先（23:40 より後など）は、最後の値のまま（配列の外を読まない・先へのばさない）
+  const n = t.cm.length, k = Math.max(0, min / 20), i = Math.min(Math.floor(k), n - 1), f = k - i;
+  const cm = i < n - 1 ? t.cm[i] + (t.cm[i + 1] - t.cm[i]) * f : t.cm[n - 1];
   const { ev, highs, lo, hi, diff, events } = tideDay(t);
   const prev = [...ev].reverse().find(e => e.m <= min), next = ev.find(e => e.m > min);
   const phase = next ? (next.k === "満潮" ? "上げ" : "下げ") : prev ? (prev.k === "満潮" ? "下げ" : "上げ") : null;
