@@ -202,6 +202,17 @@ table.jma-days tr.pop.on td:first-child { font-weight: 700; color: var(--text); 
 .wx-key { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; color: var(--text-3); margin: 8px 0 0; }
 .wx-key i { display: inline-block; width: 12px; height: 10px; border-radius: 2px; vertical-align: -1px; margin-right: 2px; }
 .wx-key i:last-of-type { margin-right: 6px; }
+/* 色の見本（js/format.js の rainCell・気温の色と同じ） */
+.wx-key .is-rain-lo { background: rgba(42,120,214,.2); }
+.wx-key .is-rain-mid, .wx-key .is-cold { background: rgba(42,120,214,.5); }
+.wx-key .is-rain-hi { background: rgba(42,120,214,.85); }
+.wx-key .is-base { background: transparent; border: 1px solid var(--line); }
+.wx-key .is-hot { background: rgba(235,104,52,.5); }
+/* 表・グラフの下の小さな見出し（気象庁の波の予報・Parameter の書き方）と、1時間ごとの表の読み方のひとこと */
+.sub-head { margin: 16px 0 8px; font-size: 13px; font-weight: 700; color: var(--text-2); }
+.tl-hint { margin: 16px 0 0; color: var(--text-2); }
+.howto-lead { margin: 0 0 8px; }
+.howto-note { margin: 8px 0 0; }
 
 /* 線アイコン（Q キットの ls-icon）。見出しの字と同じ色、まとめの項目は うすい字の色 */
 h2 .ls-icon, .facts .dt .ls-icon { vertical-align: -0.15em; }
@@ -276,7 +287,6 @@ a.fact:focus-visible, a.mini:focus-visible { outline: 2px solid var(--text-2); o
 .diary-form-title, .diary-day-title { font-size: 15px; margin: 0; }
 .diary-at { margin: 0; display: flex; align-items: center; gap: 8px; }
 .diary-note { margin: -8px 0 0; }
-select.ls-input { appearance: none; -webkit-appearance: none; color: var(--text); }
 .saw-row { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 8px; align-items: center; }
 .saw-key { font-size: 13px; color: var(--text-2); }
 /* 写真・釣果を書く欄：写真 | 時刻・魚・匹・cm | 外す */

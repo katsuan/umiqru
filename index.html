@@ -86,9 +86,9 @@
     <div class="chart" id="wave-chart"></div>
     <details class="models" id="wave-models"><summary>それぞれの予報</summary><ul></ul></details>
     <div class="table-wrap"><table id="wave-table"></table></div>
-    <h3 class="small sub" style="margin:16px 0 0;font-weight:700">1時間ごと（来る向きと高さ m・横にスクロール）</h3>
+    <p class="ls-hint tl-hint">1時間ごと（来る向きと高さ m・横にスクロール）</p>
     <div id="wave-tl"></div>
-    <h3 class="small sub" style="margin:16px 0 8px;font-weight:700">気象庁の波の予報（3日先まで）</h3>
+    <h3 class="sub-head">気象庁の波の予報（3日先まで）</h3>
     <div id="waves"></div>
   </section>
 
@@ -104,18 +104,18 @@
     <div class="chart" id="wind-chart"></div>
     <details class="models" id="wind-models"><summary>それぞれの予報</summary><ul></ul></details>
     <div class="table-wrap"><table id="wind-table"></table></div>
-    <h3 class="small sub" style="margin:16px 0 0;font-weight:700">1時間ごと（吹いてくる向きと風速 m/s・横にスクロール）</h3>
+    <p class="ls-hint tl-hint">1時間ごと（吹いてくる向きと風速 m/s・横にスクロール）</p>
     <div id="wind-tl"></div>
   </section>
 
   <section class="card" id="sec-weather" role="tabpanel" aria-labelledby="tab-weather">
     <h2><span class="ls-icon is-text" data-icon="cloud-sun" aria-hidden="true"></span>天気と降水確率</h2>
     <div id="wx-jma"></div>
-    <h3 class="small sub" style="margin:16px 0 0;font-weight:700">1時間ごと（横にスクロール）</h3>
+    <p class="ls-hint tl-hint">1時間ごと（横にスクロール）</p>
     <div id="wx-tl"></div>
     <p class="wx-key">
-      <span><i style="background:rgba(42,120,214,.2)"></i><i style="background:rgba(42,120,214,.5)"></i><i style="background:rgba(42,120,214,.85)"></i>降水確率・雨（濃いほど高い・多い）</span>
-      <span><i style="background:rgba(42,120,214,.5)"></i><i style="background:transparent;border:1px solid var(--line)"></i><i style="background:rgba(235,104,52,.5)"></i>気温（18℃を基準に、寒いと青・暑いと橙）</span>
+      <span><i class="is-rain-lo"></i><i class="is-rain-mid"></i><i class="is-rain-hi"></i>降水確率・雨（濃いほど高い・多い）</span>
+      <span><i class="is-cold"></i><i class="is-base"></i><i class="is-hot"></i>気温（18℃を基準に、寒いと青・暑いと橙）</span>
     </p>
   </section>
 
@@ -128,12 +128,12 @@
   <section class="card">
     <details class="howto" id="howto">
       <summary><span><span class="ls-icon is-text" data-icon="app" aria-hidden="true"></span><span id="howto-title"></span></span><span class="sub">開く</span></summary>
-      <p class="sub small" style="margin:0 0 8px" id="howto-lead"></p>
+      <p class="sub small howto-lead" id="howto-lead"></p>
       <ol class="steps" id="howto-steps"></ol>
-      <h3 class="small sub" style="margin:16px 0 0;font-weight:700">Parameter の書き方</h3>
+      <h3 class="sub-head">Parameter の書き方</h3>
       <div class="table-wrap"><table id="howto-params"></table></div>
-      <p class="muted small" style="margin:8px 0 0" id="howto-note"></p>
-      <p class="muted small" style="margin:8px 0 0" id="howto-version"></p>
+      <p class="muted small howto-note" id="howto-note"></p>
+      <p class="muted small howto-note" id="howto-version"></p>
     </details>
   </section>
 
