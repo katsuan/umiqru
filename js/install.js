@@ -1,5 +1,7 @@
 // うみくる：ホーム画面に置く案内。日記はブラウザごとに別の場所に残り、iPhone の Safari はしばらく開かないと消すことがあるので、日記はホーム画面のうみくるで書いてもらう
 // 読まれるところ：js/diary.js
+import { NAMES } from "./names.js";
+
 const UA = navigator.userAgent;
 const IN_LINE = /\bLine\//i.test(UA);
 export const IN_APP = IN_LINE || /FBAN|FBAV|Instagram|Twitter/i.test(UA);
@@ -43,7 +45,7 @@ export const reasonText = () => IN_APP
 
 // 置き方の手順（ol の中身）。icon … 線アイコンの HTML を作る関数、esc … HTML に入れる文字の esc
 export function stepsHtml(icon, esc) {
-  const open = "ホーム画面の「うみくる」のアイコンから開いて、日記を書く";
+  const open = `ホーム画面の「${NAMES.app}」のアイコンから開いて、日記を書く`;
   if (IN_APP) return [
     IN_LINE ? `<a href="${esc(outsideUrl())}">ふだんのブラウザで開く</a>` : "右上か下のメニューから「ブラウザで開く」（Safari・Chrome など）",
     "開いたページで、共有ボタンかメニューから「ホーム画面に追加」",

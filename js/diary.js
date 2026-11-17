@@ -929,11 +929,11 @@ function drawWhere() {
   const n = entries.length;
   // qcheck-ok: W1 決まった文字と、esc したこのページの URL だけ
   el.innerHTML = `${icon(IN_APP ? "warn" : "tip")}<div class="where-in">
-    <strong>日記は、ホーム画面のうみくるで書くのがおすすめ</strong>
+    <strong>日記は、ホーム画面の${NAMES.app}で書くのがおすすめ</strong>
     <p>${reasonText()}</p>
     <ol class="where-steps">${stepsHtml(icon, esc)}</ol>
     ${canPrompt() ? `<button type="button" class="ls-button is-primary" data-install-go>${icon("add")}ホーム画面に追加</button>` : ""}
-    ${n ? `<p>ここにある日記 ${n}件は、ホーム画面のうみくるには自動で移りません（保存の場所が別）。先に書き出して、ホーム画面のうみくるの「読みこむ」で移してください。</p>
+    ${n ? `<p>ここにある日記 ${n}件は、ホーム画面の${NAMES.app}には自動で移りません（保存の場所が別）。先に書き出して、ホーム画面の${NAMES.app}の「読みこむ」で移してください。</p>
       <button type="button" class="ls-button" data-export>${icon("backup")}${n}件を書き出す</button>` : ""}
   </div>`;
 }
